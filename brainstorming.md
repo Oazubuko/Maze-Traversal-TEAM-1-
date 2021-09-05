@@ -1,2 +1,4 @@
 # 🌩️ Brainstorming Challenge Ideas
 Put any ideas for our maze-solving challenge in this file, no matter how dumb they seem.
+Have 1 mouse run the maze at a time but save all data from previous runs allowing latter mice to use data collected by the earlier mice in order to traverse the maze faster. Under this approach the 1st mouse should have the worst time but the second and thrid mice should traverse the maze significantly faster. Maze should have one entrance and one exit.
+All three mice enter the maze from different enterences at the same time. As the mice explore the maze they share data in order to more quickly locate the exit. Maze must have 3 enterances but may have between 1 to 3 exits. If the maze has 3 exits then each mouse may have to leave the maze through a particular exit (or not).
