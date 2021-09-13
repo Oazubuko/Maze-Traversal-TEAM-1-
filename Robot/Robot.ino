@@ -1,25 +1,17 @@
 #include <math.h>
 #include "Motor.h"
-#include <Encoder.h>
 #include <Arduino_LSM9DS1.h>
 
 const unsigned int M1_ENC_A = 6;
 const unsigned int M1_ENC_B = 7;
-const unsigned int M2_ENC_A = 8;
-const unsigned int M2_ENC_B = 9;
+const unsigned int M2_ENC_A = 9;
+const unsigned int M2_ENC_B = 8;
 
 // PID Constansts
-constexpr float KP_MOTORS = 0.2;
-constexpr float KI_MOTORS = 0.1;
-constexpr float KP_TURN = 0.03;
+constexpr float KP_MOTORS = 0.3;
+constexpr float KI_MOTORS = 0.05;
+constexpr float KP_TURN = 0;
 constexpr float DISTANCE_THRESHOLD_INCHES = 0.8;
-
-// Calculating Encoder Ticks -> Inches
-constexpr float WHEEL_DIAMETER_INCHES = 1.5;
-constexpr int TICKS_PER_REV = 360;
-constexpr float INCHES_PER_REV = PI * WHEEL_DIAMETER_INCHES;
-constexpr int GEAR_RATIO = 30 / 1;
-constexpr float ENCODER_TICKS_TO_INCHES = INCHES_PER_REV / TICKS_PER_REV;
 
 // Gyro Constants
 constexpr float GYRO_BIAS = 0.74; // Degrees / sec
@@ -27,19 +19,16 @@ constexpr float GYRO_BIAS = 0.74; // Degrees / sec
 // Testing Constants
 int inchesToDrive = 5;
 
-Motor leftMotor(3, 2, A0, 0.4);
-Motor rightMotor(4, 5, A1, 0.4);
-
-Encoder leftEncoder(M1_ENC_A, M1_ENC_B);
-Encoder rightEncoder(M2_ENC_A, M2_ENC_B);
+Motor leftMotor(3, 2, A0, M1_ENC_A, M1_ENC_B, 0.4);
+Motor rightMotor(4, 5, A1, M2_ENC_A, M2_ENC_B, 0.4);
 
 /**
  * Drives the robot for the specified distance in centimeters
  */
 void driveInches(float distanceInInches) {
   // Zero out the encoder values
-  leftEncoder.write(0);
-  rightEncoder.write(0);
+  leftMotor.resetSensors();
+  rightMotor.resetSensors();
   
   float leftError = distanceInInches;
   float rightError = distanceInInches;
@@ -55,17 +44,14 @@ void driveInches(float distanceInInches) {
     int nowMicros = micros();
     dt = (nowMicros - prevMicros) / 1e6;
     prevMicros = nowMicros;
-    
-    leftError = distanceInInches - getDistanceDriven(leftEncoder);
-    leftErrorIntegral += leftError * dt;
-
-    // We have to negate the sign here since forward movement of the right motor
-    // corresponds to negative right encoder ticks
-    rightError = distanceInInches + getDistanceDriven(rightEncoder);
-    rightErrorIntegral += rightError * dt;
 
     angularError += (getAngularSpeed() - GYRO_BIAS) * dt;
     float angleAdjustment = angularError * KP_TURN;
+    
+    leftError = distanceInInches - rightMotor.getInchesDriven();
+    rightError = distanceInInches - rightMotor.getInchesDriven();
+    rightErrorIntegral += rightError * dt;
+    leftErrorIntegral += leftError * dt;
 
     float leftSpeed = leftError * KP_MOTORS 
       + leftErrorIntegral * KI_MOTORS 
@@ -102,13 +88,6 @@ void driveInches(float distanceInInches) {
 
   leftMotor.stop();
   rightMotor.stop();
-}
-
-/**
- * Transforms encoder ticks to inches
- */
-float getDistanceDriven(Encoder encoder) {
-  return ENCODER_TICKS_TO_INCHES * encoder.read();
 }
 
 /**
