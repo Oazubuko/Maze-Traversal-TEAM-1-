@@ -1,16 +1,14 @@
 #include <math.h>
-#include "Motor.h"
 #include <Arduino_LSM9DS1.h>
-
-const unsigned int M1_ENC_A = 6;
-const unsigned int M1_ENC_B = 7;
-const unsigned int M2_ENC_A = 9;
-const unsigned int M2_ENC_B = 8;
+#include "Motor.h"
+#include "Constants.h"
+#include "LineSensor.h"
 
 // PID Constansts
-constexpr float KP_MOTORS = 0.3;
-constexpr float KI_MOTORS = 0.05;
-constexpr float KP_TURN = 0;
+constexpr PIDConstants distanceConstants = { 0.25, 0, 0 };
+constexpr PIDConstants velocityConstants = { 0.25, 0, 0 };
+constexpr PIDConstants turningConstants = { 0.25, 0, 0 };
+
 constexpr float DISTANCE_THRESHOLD_INCHES = 0.8;
 
 // Gyro Constants
@@ -19,8 +17,24 @@ constexpr float GYRO_BIAS = 0.74; // Degrees / sec
 // Testing Constants
 int inchesToDrive = 5;
 
-Motor leftMotor(3, 2, A0, M1_ENC_A, M1_ENC_B, 0.4);
-Motor rightMotor(4, 5, A1, M2_ENC_A, M2_ENC_B, 0.4);
+Motor leftMotor(3, 2, A0, 6, 7);
+Motor rightMotor(4, 5, A1, 9, 8);
+
+LineSensor lineSensor(A3, A2);
+
+/**
+ * Return angular speed in degrees / sec
+ */
+float getAngularSpeed() {
+  if (!IMU.gyroscopeAvailable()) {
+    return GYRO_BIAS;
+  }
+  
+  float rotationX, rotationY, rotationZ;
+  IMU.readGyroscope(rotationX, rotationY, rotationZ);
+
+  return rotationZ;
+}
 
 /**
  * Drives the robot for the specified distance in centimeters
@@ -46,19 +60,19 @@ void driveInches(float distanceInInches) {
     prevMicros = nowMicros;
 
     angularError += (getAngularSpeed() - GYRO_BIAS) * dt;
-    float angleAdjustment = angularError * KP_TURN;
+    float angleAdjustment = angularError * turningConstants.kp;
     
     leftError = distanceInInches - rightMotor.getInchesDriven();
     rightError = distanceInInches - rightMotor.getInchesDriven();
     rightErrorIntegral += rightError * dt;
     leftErrorIntegral += leftError * dt;
 
-    float leftSpeed = leftError * KP_MOTORS 
-      + leftErrorIntegral * KI_MOTORS 
+    float leftSpeed = leftError * distanceConstants.kp 
+      + leftErrorIntegral * distanceConstants.ki 
       + angleAdjustment;
       
-    float rightSpeed = rightError * KP_MOTORS 
-      + rightErrorIntegral * KI_MOTORS
+    float rightSpeed = rightError * distanceConstants.kp 
+      + rightErrorIntegral * distanceConstants.ki
       - angleAdjustment;
 
     leftMotor.driveAtSpeed(leftSpeed);
@@ -90,21 +104,6 @@ void driveInches(float distanceInInches) {
   rightMotor.stop();
 }
 
-/**
- * Return angular speed in degrees / sec
- */
-float getAngularSpeed() {
-  if (!IMU.gyroscopeAvailable()) {
-  
-    return GYRO_BIAS;
-  }
-  
-  float rotationX, rotationY, rotationZ;
-  IMU.readGyroscope(rotationX, rotationY, rotationZ);
-
-  return rotationZ;
-}
-
 void setup() {
   Serial.begin(9600);
 
@@ -113,13 +112,41 @@ void setup() {
     while (1);
   }
   
+  lineSensor.begin();
   leftMotor.begin();
   rightMotor.begin();
 }
 
 void loop() {
-  driveInches(inchesToDrive);
-  inchesToDrive += 5;
-  delay(3000);
+  constexpr float baseSpeed = 0.135;
+  constexpr float maxSpeedAdjustment = 0.08;
+  float leftSpeed, rightSpeed;
   
+  float skew = lineSensor.getSkew();
+
+  if (lineSensor.cantSeeAnyTape()) {
+    // Drive Backwards
+    Serial.println("Driving Backwards");
+    leftSpeed = -baseSpeed * 1.25;
+    rightSpeed = -baseSpeed * 1.25;
+  } else {
+    // Determine angular adjustment
+    // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
+    leftSpeed = baseSpeed - maxSpeedAdjustment * skew;
+    rightSpeed = baseSpeed + maxSpeedAdjustment * skew;
+  }
+
+  
+  leftMotor.driveAtSpeed(leftSpeed);
+  rightMotor.driveAtSpeed(rightSpeed);
+
+  // Only print occasionally
+  if (millis() % 1000 <= 2) {
+    Serial.print("Skew = ");
+    Serial.println(skew);
+    Serial.print("Driving w/ speeds:\t");
+    Serial.print(leftSpeed);
+    Serial.print("\t");
+    Serial.println(rightSpeed);
+  }
 }

@@ -2,8 +2,8 @@
  * Utility class for motors and their associated sensors
  */
 
-#ifndef MOTOR
-#define MOTOR
+#ifndef DRIVE_TRAIN
+#define DRIVE_TRAIN
 
 #include <cstdint>
 #include <Arduino.h>
