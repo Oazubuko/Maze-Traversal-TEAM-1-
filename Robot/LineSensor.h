@@ -19,26 +19,26 @@ class LineSensor {
     constexpr static uint8_t CENTER_PIN = 7;
     constexpr static uint8_t CENTER_LEFT_PIN = 8;
 
-    uint8_t _leftPin;
-    uint8_t _rightPin;
-    Adafruit_MCP3008 _leftHalf;
-    Adafruit_MCP3008 _rightHalf;
+    uint8_t _leftADCPin;
+    uint8_t _rightADCPin;
+    Adafruit_MCP3008 _leftADC;
+    Adafruit_MCP3008 _rightADC;
 
     // Reflectance values <= to this will be considered tape
-    constexpr static int TAPE_REFLECTANCE_CUTOFF = 700;
+    constexpr static int MAX_TAPE_REFLECTANCE = 700;
 
   public:
-    LineSensor(uint8_t leftPin, uint8_t rightPin) :
-      _leftPin(leftPin),
-      _rightPin(rightPin),
-      _leftHalf(),
-      _rightHalf() 
+    LineSensor(uint8_t leftADCPin, uint8_t rightADCPin) :
+      _leftADCPin(leftADCPin),
+      _rightADCPin(rightADCPin),
+      _leftADC(),
+      _rightADC() 
     {}
 
     
     void begin() {
-      _leftHalf.begin(_leftPin);
-      _rightHalf.begin(_rightPin);
+      _leftADC.begin(_leftADCPin);
+      _rightADC.begin(_rightADCPin);
     }
 
     /**
@@ -56,24 +56,24 @@ class LineSensor {
       }
 
       // The pins are arranged in the order
-      // 13 -> 6L
-      // 12 -> 5R
-      // 11 -> 5L
-      // 10 -> 4R
+      // 13 -> Pin 6 of left ADC
+      // 12 -> Pin 5 of right ADC
+      // 11 -> Pin 5 of left ADC
+      // 10 -> Pin 4 of right ADC
       // ...
       // So we can calculate the pin as follows:
       uint8_t pin = (sensorIndex - 1) / 2;
 
-      // And the direction is "right" for even indices and "left" for odd indices
+      // And the ADC is "right" for even indices and "left" for odd indices
       if (sensorIndex % 2 == 0) {
-        return _rightHalf.readADC(pin);
+        return _rightADC.readADC(pin);
       }
 
-      return _leftHalf.readADC(pin);
+      return _leftADC.readADC(pin);
     }
     
     bool isSensorAboveTape(int sensorIndex) {
-      return getReflectanceAt(sensorIndex) < TAPE_REFLECTANCE_CUTOFF;
+      return getReflectanceAt(sensorIndex) < MAX_TAPE_REFLECTANCE;
     }
 
     bool centeredOnTape() {
@@ -97,10 +97,24 @@ class LineSensor {
         }
       }
 
-      float maxSkewPerSide = (SENSOR_COUNT - 1) / 2;
+      float maxSkewPerSide = (SENSOR_COUNT - 1) / 2.;
 
       // Normalize the skew on the range [-1, 1]
       return (rightSkew - leftSkew) / maxSkewPerSide;
+    }
+
+    /**
+     * An alternate algorithm for calculating skew using only the center 3 pins.
+     * Again, skew is a value from [-1, 1]
+     */
+    float getSkew2() {
+      float skew = 0;
+
+      if (isSensorAboveTape(CENTER_LEFT_PIN)) { skew -= 1; }
+      if (isSensorAboveTape(CENTER_RIGHT_PIN)) { skew += 1; }
+      if (centeredOnTape()) { skew *= 0.5; }
+
+      return skew;
     }
 
     bool cantSeeAnyTape() {
@@ -120,7 +134,8 @@ class LineSensor {
     }
 
     // Here is some extra logic to perform sensor calibration. It turns out that it isn't needed
-    // since the sensors are more accurate than I thought, but I wanted to leave them in regardless
+    // since the sensors are more accurate than I thought, but I wanted to leave this code here in case
+    // I need it later
 
     // constexpr static int NUM_CALIBRATION_SAMPLES = 20;
     // int tapeCutoffs[SENSOR_COUNT + 1];
