@@ -1,6 +1,3 @@
-/**
- * Utility class for motors and their associated sensors
- */
 #ifndef CONSTANTS
 #define CONSTANTS
 
@@ -19,5 +16,17 @@ typedef struct PIDConstants_t {
   float ki = 0;
   float kd = 0;
 } PIDConstants;
+
+// PID Constansts
+constexpr PIDConstants distanceConstants = { 0.075, 0, 0 };
+constexpr PIDConstants velocityConstants = { 0.25, 0, 0 };
+constexpr PIDConstants turningConstants = { 0.2, 0, 0 };
+
+constexpr float DISTANCE_THRESHOLD_INCHES = 0.8;
+constexpr float DEGREE_THRESHOLD = 4;
+constexpr float SETTLING_TIME = 0.5;
+
+// Gyro Constants
+constexpr float GYRO_BIAS = 0.74; // Degrees / sec
 
 #endif

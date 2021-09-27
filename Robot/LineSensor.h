@@ -9,6 +9,7 @@
 
 #include <Adafruit_MCP3008.h>
 #include <cstdint>
+#include "Junction.h"
 
 class LineSensor {
   public:
@@ -18,6 +19,7 @@ class LineSensor {
     constexpr static uint8_t CENTER_RIGHT_PIN = 6;
     constexpr static uint8_t CENTER_PIN = 7;
     constexpr static uint8_t CENTER_LEFT_PIN = 8;
+    constexpr static int JUNCTION_TAPE_COUNT = 3;
 
     uint8_t _leftADCPin;
     uint8_t _rightADCPin;
@@ -81,26 +83,38 @@ class LineSensor {
     }
 
     /**
+     * Returns the number of sensors with tape between the start and end index (inclusive)
+     */
+    int countTapeBetween(int startIndex, int endIndex) {
+      int tapeCount = 0;
+
+      for (int i = startIndex; i <= endIndex; i++) {
+        if (isSensorAboveTape(i)) {
+          tapeCount++;
+        }
+      }
+
+      return tapeCount;
+    }
+
+    int countRightTape() {
+      return countTapeBetween(1, CENTER_PIN - 1);
+    }
+
+    int countLeftTape() {
+      return countTapeBetween(CENTER_PIN + 1, SENSOR_COUNT);
+    }
+
+    /**
      * Return a skew value that summarizes how much the line sensor is misaligned with the
      * tape below. Skew ranges from [-1, +1]. Positive values indicate that the sensor is
      * too far right of the tape, negative values indicate that the sensor is too far left of the tape.
      */
     float getSkew() {
-      int leftSkew = 0;
-      int rightSkew = 0;
-
-      for (int i = 1; i <= SENSOR_COUNT; i++) {
-        if (i < 7 && isSensorAboveTape(i)) {
-          leftSkew++;
-        } else if (i > 7 && isSensorAboveTape(i)) {
-          rightSkew++;
-        }
-      }
-
       float maxSkewPerSide = (SENSOR_COUNT - 1) / 2.;
 
       // Normalize the skew on the range [-1, 1]
-      return (rightSkew - leftSkew) / maxSkewPerSide;
+      return (countLeftTape() - countRightTape()) / maxSkewPerSide;
     }
 
     /**
@@ -110,9 +124,9 @@ class LineSensor {
     float getSkew2() {
       float skew = 0;
 
-      if (isSensorAboveTape(CENTER_LEFT_PIN)) { skew -= 1; }
-      if (isSensorAboveTape(CENTER_RIGHT_PIN)) { skew += 1; }
-      if (centeredOnTape()) { skew *= 0.5; }
+      if (isSensorAboveTape(CENTER_LEFT_PIN)) skew -= 1;
+      if (isSensorAboveTape(CENTER_RIGHT_PIN)) skew += 1;
+      if (centeredOnTape()) skew *= 0.5;
 
       return skew;
     }
@@ -131,6 +145,30 @@ class LineSensor {
         Serial.print("\t");
       }
       Serial.println();
+    }
+
+    // Looks at the tape 
+    Junction identifyJunction() {
+      if (cantSeeAnyTape()) {
+        return Junction::DEAD_END;
+      }
+
+      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT;
+      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT;
+
+      if (foundRightJunction && foundLeftJunction) {
+        return Junction::T;
+      } else if (foundRightJunction) {
+        return Junction::RIGHT;
+      } else if (foundLeftJunction) {
+        return Junction::LEFT;
+      }
+
+      return Junction::LINE;
+    }
+
+    bool foundRightJunction() {
+      return countRightTape() > JUNCTION_TAPE_COUNT;
     }
 
     // Here is some extra logic to perform sensor calibration. It turns out that it isn't needed
