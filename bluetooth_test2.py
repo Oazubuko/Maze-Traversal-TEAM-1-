@@ -17,7 +17,7 @@ class bluetooth_test1():
         self.dirs_CHAR_UUID = "0fe79935-cd39-480a-8a44-06b70f36f24c"
 
         self.mouse2_addr    = "5B:FD:4B:44:C7:3E"
-        self.mouse3_addr    = "BB:BB:BB:BB:BB:BB"
+        self.mouse3_addr    = "B0:83:0B:D4:2B:70"
         self.mouse1_avail   = 0
         self.mouse2_avail   = 0
         self.mouse3_avail   = 0
