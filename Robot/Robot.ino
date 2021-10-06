@@ -4,13 +4,17 @@
 #include "Motor.h"
 #include "Constants.h"
 #include "LineSensor.h"
+#include "MotorPositionController.h"
 
 // Turn Controller
 double sensedAngle, angularSpeed, targetAngle;
 PID turnController(&sensedAngle, &angularSpeed, &targetAngle, 0.025, 0.03, 0.00125, DIRECT);
 
-Motor leftMotor(3, 2, A0, 6, 7);
-Motor rightMotor(4, 5, A1, 9, 8);
+Motor leftMotor(3, 2, 6, 7);
+Motor rightMotor(4, 5, 9, 8);
+
+MotorPositionController leftPosController(leftMotor, LEFT_MOTOR_POSITION_CONSTANTS);
+MotorPositionController rightPosController(rightMotor, RIGHT_MOTOR_POSITION_CONSTANTS);
 
 LineSensor lineSensor(A3, A2);
 
@@ -25,16 +29,12 @@ float getAngularSpeed() {
   float rotationX, rotationY, rotationZ;
   IMU.readGyroscope(rotationX, rotationY, rotationZ);
 
-  // TODO: remove
-  Serial.print("Angular Speed: ");
-  Serial.println(rotationZ - GYRO_BIAS);
-
   return rotationZ - GYRO_BIAS;
 }
 
 /**
-   Turn the robot to a specified angle in degrees (positive = clockwise)
-*/
+ * Turn the robot to a specified angle in degrees (positive = clockwise)
+ */
 void turnAngle(float degrees) {
   rightMotor.stop();
   leftMotor.stop();
@@ -161,36 +161,6 @@ void inchForward() {
   rightMotor.stop();
 }
 
-/**
-   Reads input from the Serial monitor in the form "kp,ki,kd" and adjusts the PID
-   constants of the supplied controller.
-*/
-void adjustPIDConstants(PID& controller) {
-  Serial.println("Enter your PID constants in the form 'kp,ki,kd': ");
-
-  while (!Serial.available()) {
-    delay(50);
-  }
-  String user_input = Serial.readString();
-
-  // Parse constants kp, ki, kd
-  int kp_end = user_input.indexOf(',');
-  int ki_end = user_input.indexOf(',', kp_end + 1);
-
-  double kp = user_input.substring(0, kp_end).toDouble();
-  double ki = user_input.substring(kp_end + 1, ki_end).toDouble();
-  double kd = user_input.substring(ki_end + 1).toDouble();
-
-  Serial.print("Setting PID constants to: ");
-  Serial.print(kp);
-  Serial.print(", ");
-  Serial.print(ki);
-  Serial.print(", ");
-  Serial.println(kd);
-
-  controller.SetTunings(kp, ki, kd);
-}
-
 void setup() {
   Serial.begin(9600);
 
@@ -208,59 +178,77 @@ void setup() {
 }
 
 void loop() {
-  constexpr float baseSpeed = 0.135;
-  constexpr float maxSpeedAdjustment = 0.08;
-  float leftSpeed, rightSpeed;
-
-  float skew = lineSensor.getSkew();
-
-  Junction junction = lineSensor.identifyJunction();
-
-  switch (junction) {
-    case Junction::DEAD_END:
-      leftMotor.driveAtSpeed(-baseSpeed * 1.25);
-      rightMotor.driveAtSpeed(- baseSpeed * 1.25);
-      break;
-
-    case Junction::T:
-    case Junction::RIGHT:
-      inchForward();
-      turnAngle(-90);
-      break;
-
-    case Junction::LEFT:
-      inchForward();
-      turnAngle(90);
-      break;
-
-    case Junction::LINE:
-    default:
-      // Determine angular adjustment
-      // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
-      leftMotor.driveAtSpeed(baseSpeed - maxSpeedAdjustment * skew);
-      rightMotor.driveAtSpeed(baseSpeed + maxSpeedAdjustment * skew);
+  rightMotor.stop();
+  rightMotor.resetSensors();
+  rightPosController.setTargetPosition(10);
+//  leftMotor.stop();
+//  leftMotor.resetSensors();
+//  leftPosController.setTargetPosition(10);
+  
+  while (!rightPosController.reachedSetpoint()) {
+//    leftPosController.update();
+    rightPosController.update();
+    delay(10);
   }
 
-  // Only print ocassionally
-  if (millis() % 1000 <= 1) {
-    if (leftSpeed < 0) {
-      Serial.println("Driving Backwards");
-    }
+//  leftMotor.stop();
+  rightMotor.stop();
+  rightPosController.adjustPIDConstants();
+  delay(5000);
   
-    Serial.print("Skew1 = ");
-    Serial.println(skew);
-  
-    Serial.print("Skew2 = ");
-    Serial.println(lineSensor.getSkew2());
-  
-    Serial.print("Driving w/ speeds:\t");
-    Serial.print(leftSpeed);
-    Serial.print("\t");
-    Serial.println(rightSpeed);
-  
-    Serial.print("Junction Type: ");
-    Serial.println(junctionAsString(junction));
-  
-    Serial.println();
-  }
+//  constexpr float baseSpeed = 0.135;
+//  constexpr float maxSpeedAdjustment = 0.08;
+//  float leftSpeed, rightSpeed;
+//
+//  float skew = lineSensor.getSkew();
+//
+//  Junction junction = lineSensor.identifyJunction();
+//
+//  switch (junction) {
+//    case Junction::DEAD_END:
+//      leftMotor.driveAtSpeed(-baseSpeed * 1.25);
+//      rightMotor.driveAtSpeed(-baseSpeed * 1.25);
+//      break;
+//
+//    case Junction::T:
+//    case Junction::RIGHT:
+//      inchForward();
+//      turnAngle(-90);
+//      break;
+//
+//    case Junction::LEFT:
+//      inchForward();
+//      turnAngle(90);
+//      break;
+//
+//    case Junction::LINE:
+//    default:
+//      // Determine angular adjustment
+//      // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
+//      leftMotor.driveAtSpeed(baseSpeed - maxSpeedAdjustment * skew);
+//      rightMotor.driveAtSpeed(baseSpeed + maxSpeedAdjustment * skew);
+//  }
+//
+//  // Only print ocassionally
+//  if (millis() % 1000 <= 1) {
+//    if (leftSpeed < 0) {
+//      Serial.println("Driving Backwards");
+//    }
+//  
+//    Serial.print("Skew1 = ");
+//    Serial.println(skew);
+//  
+//    Serial.print("Skew2 = ");
+//    Serial.println(lineSensor.getSkew2());
+//  
+//    Serial.print("Driving w/ speeds:\t");
+//    Serial.print(leftSpeed);
+//    Serial.print("\t");
+//    Serial.println(rightSpeed);
+//  
+//    Serial.print("Junction Type: ");
+//    Serial.println(junctionAsString(junction));
+//  
+//    Serial.println();
+//  }
 }
