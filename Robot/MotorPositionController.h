@@ -37,17 +37,21 @@ class MotorPositionController {
       _setpointTimer.zeroOut();
     }
 
+    void incrementTargetPosition(double positionIncrementInInches) {
+      setTargetPosition(positionIncrementInInches + _targetPosition);
+    }
+
     /**
      * Adjusts the motor's speed based on calculations of the internal PID controller.
      */
     void update() {
-      // _motorPWMVal is updated by the earlier call to .Compute()
+      // _motorPWMVal is updated by the call to .Compute()
       _sensedPosition = _motor.getInchesDriven();
       _controller.Compute();
       _motor.driveAtSpeed(_motorPWMVal);
 
       // If the setpoint is far away, the motor hasn't settled
-      if (fabs(_motor.getInchesDriven() - _targetPosition) > POSITION_THRESHOLD_INCHES) {
+      if (fabs(_sensedPosition - _targetPosition) > POSITION_THRESHOLD_INCHES) {
         _setpointTimer.zeroOut();
       }
     }

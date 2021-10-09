@@ -14,10 +14,10 @@ constexpr float ENCODER_TICKS_PER_INCH = TICKS_PER_REV / INCHES_PER_REV;
 constexpr float POSITION_THRESHOLD_INCHES = 1;
 
 // PID Constansts
-constexpr PIDConstants LEFT_MOTOR_POSITION_CONSTANTS = { 0.125, 0.01, 0.01};
-constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.12, 0.015, 0.0075 };
+constexpr PIDConstants LEFT_MOTOR_POSITION_CONSTANTS = { 0.125, 0.01, 0.01 };
+constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.11, 0.01, 0.0075 };
+constexpr PIDConstants LEFT_MOTOR_VELOCITY_CONSTANTS = { 0.5, 0, 0 };
 constexpr PIDConstants distanceConstants = { 0.075, 0, 0 };
-constexpr PIDConstants velocityConstants = { 0.25, 0, 0 };
 constexpr PIDConstants turningConstants = { 0.2, 0, 0 };
 
 constexpr float DISTANCE_THRESHOLD_INCHES = 0.8;
