@@ -27,4 +27,10 @@ void loop() {
   leftVelocityController.update();
   rightVelocityController.update();
   delay(10);
+  
+  Serial.print("LEFT ");
+  leftPosController.print();
+  Serial.print("RIGHT ");
+  rightPosController.print();
+  Serial.println();
 }

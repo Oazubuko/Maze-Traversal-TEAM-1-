@@ -76,6 +76,10 @@ class Motor {
       }
     }
 
+    int getEncoderTicksDriven() {
+      return _encoder.read();
+    }
+
     /**
      * Transforms encoder ticks to inches
      */

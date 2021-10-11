@@ -65,11 +65,7 @@ class MotorPositionController {
     }
 
     void print() {
-      Serial.print("Motor Positional PID:  ");
-      Serial.print(_motor.getInchesDriven());
-      Serial.print("in. -> ");
-      Serial.print(_targetPosition);
-      Serial.println(" in.");
+      Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in.");
     }
 };
 
