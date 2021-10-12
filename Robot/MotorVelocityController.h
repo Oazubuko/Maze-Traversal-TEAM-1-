@@ -52,6 +52,9 @@ class MotorVelocityController {
     
     void setTargetVelocity(double inchesPerSec) {
       _targetVelocity = inchesPerSec;
+    }
+
+    void reset() {
       _posController.setTargetPosition(0);
       _setpointTimer.zeroOut();
 

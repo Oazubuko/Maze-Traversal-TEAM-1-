@@ -21,6 +21,10 @@ namespace Utils {
   
     return true;
   }
+
+  inline double square(double num) {
+    return num * num;
+  }
 };
 
 #endif
