@@ -19,6 +19,7 @@ constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.11, 0.01, 0.0075 };
 constexpr PIDConstants LEFT_MOTOR_VELOCITY_CONSTANTS = { 0.5, 0, 0 };
 constexpr PIDConstants distanceConstants = { 0.075, 0, 0 };
 constexpr PIDConstants turningConstants = { 0.2, 0, 0 };
+constexpr int PID_SAMPLE_PERIOD_MS = 20;
 
 constexpr float DISTANCE_THRESHOLD_INCHES = 0.8;
 constexpr float DEGREE_THRESHOLD = 4;

@@ -27,9 +27,8 @@ class MotorPositionController {
       _setpointTimer()
     {
       _controller.SetMode(AUTOMATIC);
-
-      // Don't let the motor speed exceed 30% of max
-      _controller.SetOutputLimits(-0.3, 0.3);
+      _controller.SetOutputLimits(-0.3, 0.3); // This is fast enough :)
+      _controller.SetSampleTime(PID_SAMPLE_PERIOD_MS);
     }
     
     void setTargetPosition(double targetPositionInInches) {
@@ -65,7 +64,7 @@ class MotorPositionController {
     }
 
     void print() {
-      Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in.");
+      Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in."  + " @ PWM Speed " + String(_motorPWMVal));
     }
 };
 

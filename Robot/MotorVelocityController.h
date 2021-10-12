@@ -85,6 +85,7 @@ class MotorVelocityController {
         Serial.println("Position Increment: " + String(_prevPositionIncrement, 6) + " in.");
         Serial.println("Total Positional Error: " + String(_totalPositionalError, 6) + " in.");
         Serial.println("Inches Driven This Loop: " + String(inchesThisLoop, 6) + " in.");
+        Serial.println("Prev Inches Driven: " + String(_prevInchesDriven, 6) + " in.");
         Serial.println();
       }
     }
