@@ -9,7 +9,7 @@ enum class Junction {
   DEAD_END
 };
 
-const char* junctionAsString(Junction junction) {
+String junctionAsString(Junction junction) {
   switch (junction)
   {
     case Junction::DEAD_END: return "Dead End";

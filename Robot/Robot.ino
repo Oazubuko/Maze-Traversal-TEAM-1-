@@ -1,14 +1,16 @@
-#include <Arduino_LSM9DS1.h>
 #include <PID_v1.h>
 #include <Buzzer.h>
+#include <Arduino_LSM9DS1.h>
 #include "Motor.h"
 #include "Constants.h"
 #include "LineSensor.h"
 #include "MotorPositionController.h"
 #include "MotorVelocityController.h"
 #include "Songs.h"
+#include "Stopwatch.h"
 
 Buzzer buzzer(10);
+LineSensor lineSensor(A3, A2);
 
 Motor leftMotor(3, 2, 6, 7);
 Motor rightMotor(4, 5, 9, 8);
@@ -19,86 +21,195 @@ MotorPositionController rightPosController(rightMotor, RIGHT_MOTOR_POSITION_CONS
 MotorVelocityController leftVelocityController(leftMotor, leftPosController);
 MotorVelocityController rightVelocityController(rightMotor, rightPosController);
 
-constexpr double CURVE_RADIUS = 20;
-constexpr double ROBOT_RADIUS_INCHES = 1.5625;
-constexpr double ANGULAR_SPEED = 0.75;
+void driveStraight(double inches) {
+  leftVelocityController.reset();
+  rightVelocityController.reset();
 
-// Implements a circle of the form
-// x(t) = CURVE_RADIUS * cos(ANGULAR_SPEED * t)
-// y(t) = CURVE_RADIUS * sin(ANGULAR_SPEED * t)
-//double dxdt(double t) {
-//  return -CURVE_RADIUS * ANGULAR_SPEED * sin(ANGULAR_SPEED * t);
-//}
-//double d2x_dt2(double t) {
-//  return -CURVE_RADIUS * Utils::square(ANGULAR_SPEED) * cos(ANGULAR_SPEED * t);
-//}
-//double dydt(double t) {
-//  return CURVE_RADIUS * ANGULAR_SPEED * cos(ANGULAR_SPEED * t);
-//}
-//double d2y_dt2(double t) {
-//  return -CURVE_RADIUS * Utils::square(ANGULAR_SPEED) * sin(ANGULAR_SPEED * t);
-//}
+  leftVelocityController.setTargetVelocity(BASE_SPEED);
+  rightVelocityController.setTargetVelocity(BASE_SPEED);
 
-// Implements a figure 8 of the form
-// x(t) = CURVE_RADIUS * sin(ANGULAR_SPEED * t)
-// y(t) = CURVE_RADIUS / 2 * sin(2 * ANGULAR_SPEED * t)
-double dxdt(double t) {
-  return CURVE_RADIUS * ANGULAR_SPEED * cos(ANGULAR_SPEED * t);
+  int baseTime = millis();
+  int waitTime = (inches / BASE_SPEED) * 1000;
+  while (millis() - baseTime < waitTime) {
+    leftVelocityController.update();
+    rightVelocityController.update();
+
+    leftPosController.print();
+    rightPosController.print();
+
+    delay(PID_SAMPLE_PERIOD_MS);
+  }
+
+  leftMotor.stop();
+  rightMotor.stop();
 }
-double d2x_dt2(double t) {
-  return -CURVE_RADIUS * Utils::square(ANGULAR_SPEED) * sin(ANGULAR_SPEED * t);
-}
-double dydt(double t) {
-  return CURVE_RADIUS * ANGULAR_SPEED * cos(2 * ANGULAR_SPEED * t);
-}
-double d2y_dt2(double t) {
-  return -2 * CURVE_RADIUS * Utils::square(ANGULAR_SPEED) * sin(2 * ANGULAR_SPEED * t);
+
+
+void driveStraight2(double inches) {
+  leftPosController.reset();
+  rightPosController.reset();
+
+  leftPosController.setTargetPosition(inches);
+  rightPosController.setTargetPosition(inches);
+  
+  while (!leftPosController.reachedSetpoint() || !rightPosController.reachedSetpoint()) {
+    leftPosController.update();
+    rightPosController.update();
+
+    leftPosController.print();
+    rightPosController.print();
+
+    delay(PID_SAMPLE_PERIOD_MS);
+  }
+
+  leftMotor.stop();
+  rightMotor.stop();
 }
 
 /**
-   Calculates the desired forward velocity at a given time from the equation:
-   v = sqrt((x')^2 + (y')^2)
-*/
-double forwardSpeed(double t) {
-  return sqrt(Utils::square(dxdt(t)) + Utils::square(dydt(t)));
+ * Return angular speed in degrees / sec
+ */
+float getAngularSpeed() {
+  if (!IMU.gyroscopeAvailable()) {
+    return 0;
+  }
+
+  float rotationX, rotationY, rotationZ;
+  IMU.readGyroscope(rotationX, rotationY, rotationZ);
+
+  return rotationZ - GYRO_BIAS;
 }
 
 /**
-   Calculates the desired angular velocity, given by the equation:
-   w = (y'' * x' - y' * x'') / ((x')^2 + (y')^2)
-*/
-double angularSpeed(double t) {
-  double yPrime = dydt(t);
-  double xPrime = dxdt(t);
+ * Turn the robot to a specified angle in degrees (positive = clockwise)
+ */
+void turnAngle(float degrees) {
+  rightMotor.stop();
+  leftMotor.stop();
 
-  return (d2y_dt2(t) * xPrime - yPrime * d2x_dt2(t)) / (Utils::square(xPrime) + Utils::square(yPrime));
+  Stopwatch setpointTimer;
+
+  double sensedAngle = 0;
+  double totalError = 0;
+
+  // Keep running until we've settled on an angle (so we don't stop
+  // as soon as we get a single target measurement)
+  while (setpointTimer.getElapsedTime() < SETTLING_TIME) {
+    sensedAngle += getAngularSpeed() * setpointTimer.lap();
+
+    // Use basic P control
+    double angularSpeed = TURN_CONSTANTS.kp * (degrees - sensedAngle);
+
+    leftVelocityController.setTargetVelocity(-angularSpeed);
+    rightVelocityController.setTargetVelocity(angularSpeed);
+
+    leftVelocityController.update();
+    rightVelocityController.update();
+
+    if (fabs(degrees - sensedAngle) > DEGREE_THRESHOLD) {
+      setpointTimer.zeroOut();
+    }
+
+    Serial.println("Moving " + String(sensedAngle) + " -> " + String(degrees));
+    Serial.println("Time at Target: " + String(setpointTimer.getElapsedTime()));
+
+    delay(PID_SAMPLE_PERIOD_MS);
+  }
+
+  rightMotor.stop();
+  leftMotor.stop();
+}
+
+void turnAngle2(double degrees) {
+  leftVelocityController.reset();
+  rightVelocityController.reset();
+
+  double forwardSpeed = (degrees > 0) ? BASE_SPEED : -BASE_SPEED;
+  leftVelocityController.setTargetVelocity(-forwardSpeed);
+  rightVelocityController.setTargetVelocity(forwardSpeed);
+
+  int baseTimeMs = millis();
+  double radians = degrees / 180 * PI;
+  int timeToDriveMs = ROBOT_RADIUS_INCHES * radians / forwardSpeed * 1000;
+
+  Serial.println("Driving for " + String(timeToDriveMs) + " ms");
+  
+  while (millis() - baseTimeMs < timeToDriveMs) {
+    leftVelocityController.update();
+    rightVelocityController.update();
+
+    leftPosController.print();
+    rightPosController.print();
+
+    delay(PID_SAMPLE_PERIOD_MS);
+  }
+
+  leftMotor.stop();
+  rightMotor.stop();
+}
+
+void centerOnJunction() {
+  driveStraight(ROBOT_HEIGHT_INCHES / 2);
 }
 
 void setup() {
   Serial.begin(9600);
+  IMU.begin();
   Songs::playStarWarsTheme(buzzer);
 
   leftVelocityController.reset();
   rightVelocityController.reset();
+
+  leftVelocityController.setTargetVelocity(6);
+  rightVelocityController.setTargetVelocity(6);
 }
 
 void loop() {
-  double t = micros() * 1e-6;
-  double v = forwardSpeed(t);
-  double w = angularSpeed(t);
-  double targetLeftSpeed = v + w * ROBOT_RADIUS_INCHES;
-  double targetRightSpeed = v - w * ROBOT_RADIUS_INCHES;
-  
-  leftVelocityController.setTargetVelocity(targetLeftSpeed);
-  rightVelocityController.setTargetVelocity(targetRightSpeed);
-
   leftVelocityController.update();
   rightVelocityController.update();
 
-  Serial.println("LEFT");
-  leftPosController.print();
-  Serial.println("RIGHT");
-  rightPosController.print();
-  
   delay(PID_SAMPLE_PERIOD_MS);
+  
+//  turnAngle2(-90);
+//  delay(1000);
+//  turnAngle2(90);
+//  delay(1000);
+
+//  float skew = lineSensor.getSkew();
+//  Junction junction = lineSensor.identifyJunction();
+
+//  switch (junction) {
+//    case Junction::DEAD_END:
+//      leftMotor.stop();
+//      rightMotor.stop();
+//      break;
+//
+//    case Junction::T:
+//    case Junction::RIGHT:
+//      centerOnJunction();
+//      turnAngle(-90);
+//      break;
+//
+//    case Junction::LEFT:
+//      centerOnJunction();
+//      turnAngle(90);
+//      break;
+//
+//    case Junction::LINE:
+//    default:
+//      // Determine angular adjustment
+//      // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
+//      leftVelocityController.setTargetVelocity(BASE_SPEED - MAX_SPEED_ADJUSTMENT * skew);
+//      rightVelocityController.setTargetVelocity(BASE_SPEED + MAX_SPEED_ADJUSTMENT * skew);
+//  }
+
+
+//  // Only print ocassionally
+//  if (millis() % 1000 <= 1) {
+//    Serial.println("Skew1 = " + String(skew));
+//    Serial.println("Skew2 = " + String(lineSensor.getSkew2()));
+//    Serial.println("Driving w/ speeds:\t" + String(leftVelocityController.getTargetVelocity()) + "\t" + String(rightVelocityController.getTargetVelocity()));
+//    Serial.println("Junction Type: " + junctionAsString(junction));
+//    Serial.println();
+//  }
 }

@@ -6,18 +6,23 @@
 class Stopwatch {
   private:
     double _prevTimeMicros;
+    double _baseTimeMicros;
 
   public:
+    Stopwatch() {
+      zeroOut();
+    }
+  
     /**
-     * Resets the timer to zeroOut should be called at least once before any other timing methods
+     * Resets the timer to zero. Should be called at least once before any other timing methods
      */
     void zeroOut() {
-      _prevTimeMicros = micros();
+      _baseTimeMicros = micros();
+      _prevTimeMicros = _baseTimeMicros;
     }
 
     /**
-     * Returns the amount of time since this function or the zeroOut function was last called and
-     * updates the base time
+     * Returns the amount of time since this function or the zeroOut function was last called
      */
     double lap() {
       double now = micros();
@@ -28,10 +33,10 @@ class Stopwatch {
     }
 
     /**
-     * Returns the amount of time spent **without updating the base time**
+     * Returns the amount of time since the stopwatch was reset (or initialized)
      */
     double getElapsedTime() {
-      return (micros() - _prevTimeMicros) * 1e-6;
+      return (micros() - _baseTimeMicros) * 1e-6;
     }
 };
 

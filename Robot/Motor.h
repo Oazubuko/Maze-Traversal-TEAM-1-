@@ -87,7 +87,7 @@ class Motor {
       return _encoder.read() / ENCODER_TICKS_PER_INCH;
     }
 
-    void resetSensors() {
+    void resetEncoder() {
       _encoder.write(0);
     }
 };

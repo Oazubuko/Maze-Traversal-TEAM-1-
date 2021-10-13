@@ -33,11 +33,23 @@ class MotorPositionController {
     
     void setTargetPosition(double targetPositionInInches) {
       _targetPosition = targetPositionInInches;
-      _setpointTimer.zeroOut();
+    }
+    
+    void incrementTargetPosition(double positionIncrement) {
+      setTargetPosition(_targetPosition + positionIncrement);
     }
 
-    void incrementTargetPosition(double positionIncrementInInches) {
-      setTargetPosition(positionIncrementInInches + _targetPosition);
+    void reset() {
+      _motor.resetEncoder();
+      _setpointTimer.zeroOut();
+      
+      setTargetPosition(0);
+
+      // Hack to reset the output of the PID controller to 0
+      // See https://github.com/br3ttb/Arduino-PID-Library/issues/76#issuecomment-678644330
+      _controller.SetMode(MANUAL);
+      _motorPWMVal = 0;
+      _controller.SetMode(AUTOMATIC);
     }
 
     /**
@@ -64,7 +76,7 @@ class MotorPositionController {
     }
 
     void print() {
-      Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in."  + " @ PWM Speed " + String(_motorPWMVal));
+      Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in."  + " @ PWM " + String(_motorPWMVal));
     }
 };
 

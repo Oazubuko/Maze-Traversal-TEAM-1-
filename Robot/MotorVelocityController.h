@@ -42,6 +42,7 @@ class MotorVelocityController {
     double _prevInchesDriven;
     double _totalPositionalError;
     double _prevPositionIncrement;
+    double _dt;
     
   public:
     MotorVelocityController(Motor& motor, MotorPositionController& posController) :
@@ -55,7 +56,7 @@ class MotorVelocityController {
     }
 
     void reset() {
-      _posController.setTargetPosition(0);
+      _posController.reset();
       _setpointTimer.zeroOut();
 
       // Extra statistics for debugging purposes
@@ -64,33 +65,35 @@ class MotorVelocityController {
     }
 
     /**
-     * Should be called frequently every loop for solid performance
+     * Drive the motor an extra v_target * dt every loop.
+     * Should be called at the specified PID sample rate for solid performance
      */
-    void update(bool print=false) {
-      // Every loop, the motor should drive an extra v_target * dt
-      double dt = _setpointTimer.lap();
-      _posController.incrementTargetPosition(_targetVelocity * dt);
+    void update() {
+      // Every loop, the motor should drive an extra 
+      _dt = _setpointTimer.lap();
+      _posController.incrementTargetPosition(_targetVelocity * _dt);
       _posController.update();
+    }
 
-      if (print) {
-        // Calculate some statistics about the current velocity
-        double inchesDriven = _motor.getInchesDriven();
-        double inchesThisLoop = inchesDriven - _prevInchesDriven;
-        _prevInchesDriven = inchesDriven;
-        
-        double sensedVelocity = inchesThisLoop / dt;
-        _totalPositionalError += inchesThisLoop - _prevPositionIncrement;
-        _prevPositionIncrement = _targetVelocity * dt;
-        
-        Serial.println("dt: " + String(dt, 6) + " seconds");
-        Serial.println("Sensed Velocity: " + String(sensedVelocity, 6) + " in. / sec");
-        Serial.println("Velocity Error: " + String((sensedVelocity - _targetVelocity), 6) + " in. / sec.");
-        Serial.println("Position Increment: " + String(_prevPositionIncrement, 6) + " in.");
-        Serial.println("Total Positional Error: " + String(_totalPositionalError, 6) + " in.");
-        Serial.println("Inches Driven This Loop: " + String(inchesThisLoop, 6) + " in.");
-        Serial.println("Prev Inches Driven: " + String(_prevInchesDriven, 6) + " in.");
-        Serial.println();
-      }
+    double getTargetVelocity() {
+      return _targetVelocity;
+    }
+
+    void print() {
+      // Calculate some statistics about the current velocity
+      double inchesDriven = _motor.getInchesDriven();
+      double inchesThisLoop = inchesDriven - _prevInchesDriven;
+      _prevInchesDriven = inchesDriven;
+      
+      double sensedVelocity = inchesThisLoop / _dt;
+      _totalPositionalError += inchesThisLoop - _prevPositionIncrement;
+      _prevPositionIncrement = _targetVelocity * _dt;
+      
+      Serial.println("dt: " + String(_dt, 6) + " seconds");
+      Serial.println("Velocity: " + String(sensedVelocity, 6) + " in. / sec -> " + String(_targetVelocity, 6) + " in. / sec");
+      Serial.println("Position Increment: " + String(_prevPositionIncrement, 6) + " in.");
+      Serial.println("Total Positional Error: " + String(_totalPositionalError, 6) + " in.");
+      Serial.println();
     }
 };
 
