@@ -89,7 +89,7 @@ void loop()
     {
       gzsum = (gz+.5)*dt + gzsum;
     }//if(abs(gz) > 1)
-    if((axsum > tol & aysum < tol) | gzsum > tol)
+    if((axsum > tol & aysum > tol) | gzsum > tol)
     {
        flagCharacteristic.setValue(1);
     }//End of if((mxsum > tol & mysum > tol) | gzsum > tol)
