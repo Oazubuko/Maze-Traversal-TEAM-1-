@@ -21,6 +21,26 @@ MotorPositionController rightPosController(rightMotor, RIGHT_MOTOR_POSITION_CONS
 MotorVelocityController leftVelocityController(leftMotor, leftPosController);
 MotorVelocityController rightVelocityController(rightMotor, rightPosController);
 
+void driveStraightForever() {
+  Stopwatch angleStopwatch;
+  double totalAngle = 0;
+  
+  while (true) {
+    totalAngle += getAngularSpeed() * angleStopwatch.lap() ;
+  
+    double kp = 0.25;
+    double angularAdjustment = -totalAngle * kp;    
+  
+    leftVelocityController.setTargetVelocity(BASE_SPEED - angularAdjustment);
+    rightVelocityController.setTargetVelocity(BASE_SPEED + angularAdjustment);  
+    
+    leftVelocityController.update();
+    rightVelocityController.update();
+
+    delay(PID_SAMPLE_TIME_MS);
+  }  
+}
+
 void driveStraight(double inches) {
   leftVelocityController.reset();
   rightVelocityController.reset();
@@ -159,15 +179,9 @@ void setup() {
 
   leftVelocityController.reset();
   rightVelocityController.reset();
-
-  leftVelocityController.setTargetVelocity(6);
-  rightVelocityController.setTargetVelocity(6);
 }
 
 void loop() {
-  leftVelocityController.update();
-  rightVelocityController.update();
-
   delay(PID_SAMPLE_PERIOD_MS);
   
 //  turnAngle2(-90);

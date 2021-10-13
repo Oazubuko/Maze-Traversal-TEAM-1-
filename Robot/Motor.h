@@ -76,7 +76,7 @@ class Motor {
       }
     }
 
-    int getEncoderTicksDriven() {
+    int getEncoderTicks() {
       return _encoder.read();
     }
 
