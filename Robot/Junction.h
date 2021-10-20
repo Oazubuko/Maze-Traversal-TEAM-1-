@@ -1,5 +1,4 @@
-#ifndef JUNCTION
-#define JUNCTION
+#pragma once
 
 enum class Junction {
   LEFT,
@@ -20,5 +19,3 @@ String junctionAsString(Junction junction) {
     default: return "Unknown junction";
   }
 }
-
-#endif

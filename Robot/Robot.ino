@@ -21,27 +21,98 @@ MotorPositionController rightPosController(rightMotor, RIGHT_MOTOR_POSITION_CONS
 MotorVelocityController leftVelocityController(leftMotor, leftPosController);
 MotorVelocityController rightVelocityController(rightMotor, rightPosController);
 
+// Forward Declarations
+void driveStraightForever(void);
+void driveStraight(double inches);
+void driveStraight2(double inches);
+float getAngularSpeed();
+void turnAngle(double degrees);
+void turnAngle2(double degrees);
+void driveUntilJunction();
+void centerOnJunction();
+
+void setup() {
+  Serial.begin(9600);
+
+  if (!IMU.begin()) {
+    Serial.println("Failed to initialize IMU!");
+    while (1);
+  }
+
+  Songs::playStarWarsTheme(buzzer);
+
+  lineSensor.begin();
+
+  leftVelocityController.reset();
+  rightVelocityController.reset();
+}
+
+void loop() {
+  turnAngle(90);
+  delay(2000);
+  
+  turnAngle(-90);
+  delay(2000);
+  
+  turnAngle(180);
+  delay(2000);
+  
+//  Junction junction = lineSensor.identifyJunction();
+//  Serial.println(junctionAsString(junction));
+//  Serial.println("Skew: " + String(lineSensor.getSkew()));
+//  Serial.println("Skew2: " + String(lineSensor.getSkew2()));
+//  
+//  switch (junction) {
+//    case Junction::DEAD_END:
+//      turnAngle(180);
+//      break;
+//
+//    case Junction::T:
+//    case Junction::RIGHT:
+//      centerOnJunction();
+//      turnAngle(-90);
+//      break;
+//
+//    case Junction::LEFT:
+//      centerOnJunction();
+//      turnAngle(90);
+//      break;
+//
+//    case Junction::LINE:
+//    default:
+//      float skew = lineSensor.getSkew();
+//      leftVelocityController.setTargetVelocity(BASE_SPEED + SKEW_ADJUSTMENT_FACTOR * skew);
+//      rightVelocityController.setTargetVelocity(BASE_SPEED - SKEW_ADJUSTMENT_FACTOR * skew);
+//
+//      leftVelocityController.update();
+//      rightVelocityController.update();
+//      break;
+//  }
+}
+
 void driveStraightForever() {
   Stopwatch angleStopwatch;
   double totalAngle = 0;
-  
+
   while (true) {
-    totalAngle += getAngularSpeed() * angleStopwatch.lap() ;
-  
+    totalAngle += getAngularSpeed() * angleStopwatch.lap();
+
     double kp = 0.25;
-    double angularAdjustment = -totalAngle * kp;    
-  
+    double angularAdjustment = -totalAngle * kp;
+
     leftVelocityController.setTargetVelocity(BASE_SPEED - angularAdjustment);
-    rightVelocityController.setTargetVelocity(BASE_SPEED + angularAdjustment);  
-    
+    rightVelocityController.setTargetVelocity(BASE_SPEED + angularAdjustment);
+
     leftVelocityController.update();
     rightVelocityController.update();
 
-    delay(PID_SAMPLE_TIME_MS);
-  }  
+    delay(PID_SAMPLE_PERIOD_MS);
+  }
 }
 
 void driveStraight(double inches) {
+  Serial.println("Drive: " + String(inches) + "in.");
+
   leftVelocityController.reset();
   rightVelocityController.reset();
 
@@ -54,9 +125,6 @@ void driveStraight(double inches) {
     leftVelocityController.update();
     rightVelocityController.update();
 
-    leftPosController.print();
-    rightPosController.print();
-
     delay(PID_SAMPLE_PERIOD_MS);
   }
 
@@ -66,18 +134,17 @@ void driveStraight(double inches) {
 
 
 void driveStraight2(double inches) {
+  Serial.println("Drive2: " + String(inches) + "in.");
+
   leftPosController.reset();
   rightPosController.reset();
 
   leftPosController.setTargetPosition(inches);
   rightPosController.setTargetPosition(inches);
-  
+
   while (!leftPosController.reachedSetpoint() || !rightPosController.reachedSetpoint()) {
     leftPosController.update();
     rightPosController.update();
-
-    leftPosController.print();
-    rightPosController.print();
 
     delay(PID_SAMPLE_PERIOD_MS);
   }
@@ -87,8 +154,8 @@ void driveStraight2(double inches) {
 }
 
 /**
- * Return angular speed in degrees / sec
- */
+   Return angular speed in degrees / sec
+*/
 float getAngularSpeed() {
   if (!IMU.gyroscopeAvailable()) {
     return 0;
@@ -101,24 +168,28 @@ float getAngularSpeed() {
 }
 
 /**
- * Turn the robot to a specified angle in degrees (positive = clockwise)
- */
-void turnAngle(float degrees) {
+   Turn the robot to a specified angle in degrees (positive = counter-clockwise)
+*/
+void turnAngle(double degrees) {
+  Serial.println("Turning to angle " + String(degrees));
   rightMotor.stop();
   leftMotor.stop();
 
   Stopwatch setpointTimer;
 
-  double sensedAngle = 0;
-  double totalError = 0;
+  float sensedAngle = 0;
+  float degreesPerSec = 40;
 
-  // Keep running until we've settled on an angle (so we don't stop
-  // as soon as we get a single target measurement)
-  while (setpointTimer.getElapsedTime() < SETTLING_TIME) {
+  // Keep running until we've settled on an angle or reached a timeout
+  while (setpointTimer.getElapsedTime() < SETTLING_TIME || setpointTimer.getElapsedTime() > PID_TIMEOUT) {
     sensedAngle += getAngularSpeed() * setpointTimer.lap();
 
     // Use basic P control
-    double angularSpeed = TURN_CONSTANTS.kp * (degrees - sensedAngle);
+    float targetAngle = (targetAngle >= degrees)
+      ? degrees 
+      : setpointTimer.getElapsedTime() * degreesPerSec;
+    
+    float angularSpeed = TURN_CONSTANTS.kp * (targetAngle - sensedAngle);
 
     leftVelocityController.setTargetVelocity(-angularSpeed);
     rightVelocityController.setTargetVelocity(angularSpeed);
@@ -140,90 +211,24 @@ void turnAngle(float degrees) {
   leftMotor.stop();
 }
 
-void turnAngle2(double degrees) {
-  leftVelocityController.reset();
-  rightVelocityController.reset();
+void centerOnJunction() {
+  Serial.println("Centering on junction");
+  driveStraight(ROBOT_HEIGHT_INCHES / 2);
+  delay(2000);
+}
 
-  double forwardSpeed = (degrees > 0) ? BASE_SPEED : -BASE_SPEED;
-  leftVelocityController.setTargetVelocity(-forwardSpeed);
-  rightVelocityController.setTargetVelocity(forwardSpeed);
+void driveUntilJunction() {
+  Serial.println("Driving to Junction");
+  while (lineSensor.identifyJunction() == Junction::LINE) {
+    // Determine angular adjustment
+    // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
+    float skew = lineSensor.getSkew();
+    leftVelocityController.setTargetVelocity(BASE_SPEED - SKEW_ADJUSTMENT_FACTOR * skew);
+    rightVelocityController.setTargetVelocity(BASE_SPEED + SKEW_ADJUSTMENT_FACTOR * skew);
 
-  int baseTimeMs = millis();
-  double radians = degrees / 180 * PI;
-  int timeToDriveMs = ROBOT_RADIUS_INCHES * radians / forwardSpeed * 1000;
-
-  Serial.println("Driving for " + String(timeToDriveMs) + " ms");
-  
-  while (millis() - baseTimeMs < timeToDriveMs) {
     leftVelocityController.update();
     rightVelocityController.update();
 
-    leftPosController.print();
-    rightPosController.print();
-
     delay(PID_SAMPLE_PERIOD_MS);
   }
-
-  leftMotor.stop();
-  rightMotor.stop();
-}
-
-void centerOnJunction() {
-  driveStraight(ROBOT_HEIGHT_INCHES / 2);
-}
-
-void setup() {
-  Serial.begin(9600);
-  IMU.begin();
-  Songs::playStarWarsTheme(buzzer);
-
-  leftVelocityController.reset();
-  rightVelocityController.reset();
-}
-
-void loop() {
-  delay(PID_SAMPLE_PERIOD_MS);
-  
-//  turnAngle2(-90);
-//  delay(1000);
-//  turnAngle2(90);
-//  delay(1000);
-
-//  float skew = lineSensor.getSkew();
-//  Junction junction = lineSensor.identifyJunction();
-
-//  switch (junction) {
-//    case Junction::DEAD_END:
-//      leftMotor.stop();
-//      rightMotor.stop();
-//      break;
-//
-//    case Junction::T:
-//    case Junction::RIGHT:
-//      centerOnJunction();
-//      turnAngle(-90);
-//      break;
-//
-//    case Junction::LEFT:
-//      centerOnJunction();
-//      turnAngle(90);
-//      break;
-//
-//    case Junction::LINE:
-//    default:
-//      // Determine angular adjustment
-//      // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
-//      leftVelocityController.setTargetVelocity(BASE_SPEED - MAX_SPEED_ADJUSTMENT * skew);
-//      rightVelocityController.setTargetVelocity(BASE_SPEED + MAX_SPEED_ADJUSTMENT * skew);
-//  }
-
-
-//  // Only print ocassionally
-//  if (millis() % 1000 <= 1) {
-//    Serial.println("Skew1 = " + String(skew));
-//    Serial.println("Skew2 = " + String(lineSensor.getSkew2()));
-//    Serial.println("Driving w/ speeds:\t" + String(leftVelocityController.getTargetVelocity()) + "\t" + String(rightVelocityController.getTargetVelocity()));
-//    Serial.println("Junction Type: " + junctionAsString(junction));
-//    Serial.println();
-//  }
 }

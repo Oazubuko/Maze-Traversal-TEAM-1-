@@ -1,9 +1,7 @@
 /**
  * A PWM-based position controller for a motor
  */
-
-#ifndef MOTOR_POS_CONTROLLER
-#define MOTOR_POS_CONTROLLER
+#pragma once
 
 #include <Arduino.h>
 #include <PID_v1.h>
@@ -79,5 +77,3 @@ class MotorPositionController {
       Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in."  + " @ PWM " + String(_motorPWMVal));
     }
 };
-
-#endif

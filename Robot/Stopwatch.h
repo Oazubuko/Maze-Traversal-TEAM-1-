@@ -1,6 +1,4 @@
-#ifndef STOPWATCH
-#define STOPWATCH
-
+#pragma once
 #include <Arduino.h>
 
 class Stopwatch {
@@ -39,5 +37,3 @@ class Stopwatch {
       return (micros() - _baseTimeMicros) * 1e-6;
     }
 };
-
-#endif

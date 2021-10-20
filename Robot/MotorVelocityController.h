@@ -21,8 +21,7 @@
   *     - OR you can integrate the positional error at the outer loop, and pass that in as an additional
   *       component as the velocity command. This allows you to maintain the separation of the two loops.
   */
-#ifndef MOTOR_VELOCITY_CONTROLLER
-#define MOTOR_VELOCITY_CONTROLLER
+#pragma once
 
 #include <Arduino.h>
 #include <PID_v1.h>
@@ -96,5 +95,3 @@ class MotorVelocityController {
       Serial.println();
     }
 };
-
-#endif

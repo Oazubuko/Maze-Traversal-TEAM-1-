@@ -1,9 +1,7 @@
 /**
    Utility class for motors and their associated sensors
 */
-
-#ifndef MOTOR
-#define MOTOR
+#pragma once
 
 #include <cstdint>
 #include <Arduino.h>
@@ -91,5 +89,3 @@ class Motor {
       _encoder.write(0);
     }
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef UTILS
-#define UTILS
+#pragma once
 
 #include <Arduino.h>
 
@@ -26,5 +25,3 @@ namespace Utils {
     return num * num;
   }
 };
-
-#endif

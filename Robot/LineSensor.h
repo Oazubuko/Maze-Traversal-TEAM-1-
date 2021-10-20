@@ -4,8 +4,7 @@
  * sensor array (e.g., the pin labeled "8" on the Pololu board will be accessed using
  * index 8 in this class). Since the sensor array is 1-based indexed, so is this class.
  */
-#ifndef LINE_SENSOR
-#define LINE_SENSOR
+#pragma once
 
 #include <Adafruit_MCP3008.h>
 #include <cstdint>
@@ -19,25 +18,25 @@ class LineSensor {
     constexpr static uint8_t CENTER_RIGHT_PIN = 6;
     constexpr static uint8_t CENTER_PIN = 7;
     constexpr static uint8_t CENTER_LEFT_PIN = 8;
-    constexpr static int JUNCTION_TAPE_COUNT = 3;
+    constexpr static int JUNCTION_TAPE_COUNT = 4;
+    constexpr static int MAX_TAPE_REFLECTANCE = 690; // Reflectance values <= to this will be considered tape
 
     uint8_t _leftADCPin;
     uint8_t _rightADCPin;
     Adafruit_MCP3008 _leftADC;
     Adafruit_MCP3008 _rightADC;
 
-    // Reflectance values <= to this will be considered tape
-    constexpr static int MAX_TAPE_REFLECTANCE = 700;
-
   public:
     LineSensor(uint8_t leftADCPin, uint8_t rightADCPin) :
       _leftADCPin(leftADCPin),
       _rightADCPin(rightADCPin),
       _leftADC(),
-      _rightADC() 
+      _rightADC()
     {}
 
-    
+    /**
+     * Attaches the 
+     */
     void begin() {
       _leftADC.begin(_leftADCPin);
       _rightADC.begin(_rightADCPin);
@@ -54,7 +53,7 @@ class LineSensor {
         Serial.print(sensorIndex);
         Serial.println("' is not in the range of valid sample indexes (1 - 13 inclusive)");
 
-        return -1; // TODO: return exception?
+        return -1;
       }
 
       // The pins are arranged in the order
@@ -118,17 +117,22 @@ class LineSensor {
     }
 
     /**
-     * An alternate algorithm for calculating skew using only the center 3 pins.
+     * An alternate algorithm for calculating skew that gives extra weight to the one
      * Again, skew is a value from [-1, 1]
      */
     float getSkew2() {
+      constexpr float MAX_SKEW_PER_SIDE = 21;
       float skew = 0;
 
-      if (isSensorAboveTape(CENTER_LEFT_PIN)) skew -= 1;
-      if (isSensorAboveTape(CENTER_RIGHT_PIN)) skew += 1;
-      if (centeredOnTape()) skew *= 0.5;
+      // Values left of the CENTER_PIN contribute positive skew,
+      // values to the right of the CENTER pin contribute negative skew
+      for(int i = 1; i <= SENSOR_COUNT; i++) {
+        if (isSensorAboveTape(i)) {
+          skew += i - CENTER_PIN;
+        }
+      }
 
-      return skew;
+      return skew / MAX_SKEW_PER_SIDE;
     }
 
     bool cantSeeAnyTape() {
@@ -141,7 +145,7 @@ class LineSensor {
 
     void printAllSensorValues() {
       for (int i = SENSOR_COUNT; i >= 1; i--) {
-        Serial.print(isSensorAboveTape(i));
+        Serial.print(getReflectanceAt(i));
         Serial.print("\t");
       }
       Serial.println();
@@ -153,8 +157,8 @@ class LineSensor {
         return Junction::DEAD_END;
       }
 
-      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT;
-      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT;
+      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT && centeredOnTape();
+      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT && centeredOnTape();
 
       if (foundRightJunction && foundLeftJunction) {
         return Junction::T;
@@ -165,10 +169,6 @@ class LineSensor {
       }
 
       return Junction::LINE;
-    }
-
-    bool foundRightJunction() {
-      return countRightTape() > JUNCTION_TAPE_COUNT;
     }
 
     // Here is some extra logic to perform sensor calibration. It turns out that it isn't needed
@@ -215,5 +215,3 @@ class LineSensor {
     //   Serial.println();
     // }
 };
-
-#endif
