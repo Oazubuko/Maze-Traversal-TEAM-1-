@@ -66,7 +66,7 @@ void loop()
 {
   
   if (IMU.accelerationAvailable()) 
-  {
+  { 
     IMU.readAcceleration(ax, ay, az);
   }//End of if (IMU.accelerationAvailable())
 
