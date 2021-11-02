@@ -157,8 +157,8 @@ class LineSensor {
         return Junction::DEAD_END;
       }
 
-      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT && centeredOnTape();
-      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT && centeredOnTape();
+      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT;
+      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT;
 
       if (foundRightJunction && foundLeftJunction) {
         return Junction::T;

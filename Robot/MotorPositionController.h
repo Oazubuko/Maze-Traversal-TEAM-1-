@@ -73,6 +73,10 @@ class MotorPositionController {
       PIDHelpers::adjustPIDConstants(_controller);
     }
 
+    double getTargetPosition() {
+      return _targetPosition;
+    }
+
     void print() {
       Serial.println("Position Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in."  + " @ PWM " + String(_motorPWMVal));
     }

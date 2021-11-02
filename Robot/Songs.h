@@ -31,4 +31,23 @@ namespace Songs {
 
     buzzer.end(100);
   }
+
+  void playMarioTheme(Buzzer& buzzer) {
+    buzzer.begin(100);
+
+    buzzer.sound(NOTE_E7, 80);
+    buzzer.sound(NOTE_E7, 80);
+    buzzer.sound(0, 80);
+    buzzer.sound(NOTE_E7, 80);
+    buzzer.sound(0, 80);
+    buzzer.sound(NOTE_C7, 80);
+    buzzer.sound(NOTE_E7, 80);
+    buzzer.sound(0, 80);
+    buzzer.sound(NOTE_G7, 80);
+    buzzer.sound(0, 240);
+    buzzer.sound(NOTE_G6, 80);
+    buzzer.sound(0, 240);
+  
+    buzzer.end(100);
+  }
 };
