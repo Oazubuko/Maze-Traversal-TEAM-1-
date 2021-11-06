@@ -52,17 +52,15 @@ void setup() {
   rightVelocityController.reset();
 }
 
-void loop() {  
+void loop() {
   Junction junction = lineSensor.identifyJunction();
   Serial.println(junctionAsString(junction));
-  Serial.println("Skew: " + String(lineSensor.getSkew()));
-  Serial.println("Skew2: " + String(lineSensor.getSkew2()));
-  
+
   switch (junction) {
     case Junction::DEAD_END:
-      buzzer.sound(NOTE_E7, 200);
-      turnAngle(180);
-      break;
+    buzzer.sound(NOTE_E7, 200);
+    turnAngle(180);
+    break;      
 
     case Junction::T:
       buzzer.sound(NOTE_C7, 200);
@@ -75,7 +73,13 @@ void loop() {
     case Junction::LEFT:
       buzzer.sound(NOTE_B7, 200);
       centerOnJunction();
-      turnAngle(90);
+
+      // If this is a + junction, and not a left junction, 
+      // don't bother turning
+      if (lineSensor.identifyJunction() == Junction::DEAD_END) {
+        turnAngle(90);
+      }
+      
       break;
 
     case Junction::LINE:
