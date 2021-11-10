@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#ps -ef | grep bluetooth_test7
-#sudo kill -9 #
-
-sudo ./bluetooth_test7.py Ed &
+#shutdown.sh
+pkill -f socket
+socket_server.py &
+sudo ./bluetooth_test9.py Ed &
 sleep 2
-sudo ./bluetooth_test7.py Zach &
+sudo ./bluetooth_test9.py Zach &
 sleep 3
-sudo ./bluetooth_test7.py Machi &
+sudo ./bluetooth_test9.py Loaner &
