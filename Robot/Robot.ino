@@ -9,6 +9,7 @@
 #include "Songs.h"
 #include "Stopwatch.h"
 #include "Gyro.h"
+#include "PositionEstimator.h"
 
 // Turn Controller
 double sensedAngle, angularSpeed, targetAngle;
@@ -28,6 +29,8 @@ MotorVelocityController leftVelocityController(leftMotor, leftPosController);
 MotorVelocityController rightVelocityController(rightMotor, rightPosController);
 
 Gyro gyro;
+
+PositionEstimator posEstimator(leftMotor, rightMotor, gyro);
 
 // Forward Declarations
 void driveStraightForever(void);
@@ -119,6 +122,8 @@ void turnAngle(double degrees) {
     leftVelocityController.update();
     rightVelocityController.update();
 
+    posEstimator.update();
+
     if (fabs(sensedAngle - targetAngle) >= DEGREE_THRESHOLD) {
       setpointTimer.zeroOut();
     }
@@ -145,11 +150,13 @@ void driveStraightForever() {
     double kp = 0.25;
     double angularAdjustment = (gyro.getAngle() - startAngle) * kp;
 
-    leftVelocityController.setTargetVelocity(BASE_SPEED - angularAdjustment);
-    rightVelocityController.setTargetVelocity(BASE_SPEED + angularAdjustment);
+    leftVelocityController.setTargetVelocity(BASE_SPEED + angularAdjustment);
+    rightVelocityController.setTargetVelocity(BASE_SPEED - angularAdjustment);
 
     leftVelocityController.update();
     rightVelocityController.update();
+
+    posEstimator.update();
 
     delay(PID_SAMPLE_PERIOD_MS);
   }
@@ -180,6 +187,8 @@ void driveStraight(double inches) {
       rightPosController.update();
     }
 
+    posEstimator.update();
+
     delay(PID_SAMPLE_PERIOD_MS);
   }
 
@@ -207,6 +216,8 @@ void driveUntilJunction() {
 
     leftVelocityController.update();
     rightVelocityController.update();
+
+    posEstimator.update();
 
     delay(PID_SAMPLE_PERIOD_MS);
   }
