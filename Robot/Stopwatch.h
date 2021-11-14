@@ -31,6 +31,13 @@ class Stopwatch {
     }
 
     /**
+     * Return the number of seconds since the last lap, without updating any internal state
+     */
+    double peekTimeSinceLastLap() {
+      return (micros() - _prevTimeMicros) * 1e-6;
+    }
+
+    /**
      * Returns the amount of time since the stopwatch was reset (or initialized)
      */
     double getElapsedTime() {

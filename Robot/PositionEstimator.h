@@ -50,17 +50,16 @@ public:
     // v_right            = v - rw
     // (v_left + v_right) = 2v
     // v                  = 1/2 * (v_left + v_right)
-    float dt = _stopwatch.lap(); // TODO: remove
-    float velocity = 0.5 * ((leftInches - _prevLeftInches) + (rightInches - _prevRightInches));
+    // dpos = 1/2 * (v_left + v_right) * dt
+    //      = 1/2 * (d_left_motor_pos + d_right_motor_pos)
+    float dpos = 0.5 * ((leftInches - _prevLeftInches) + (rightInches - _prevRightInches));
 
     // Compute dx & dt
-    _x += velocity * sin(-headingRadians);
-    _y += velocity * cos(headingRadians);
+    _x += dpos * sin(-headingRadians);
+    _y += dpos * cos(headingRadians);
 
     _prevLeftInches = leftInches;
     _prevRightInches = rightInches;
-
-    print();
   }
 
   /**
@@ -85,6 +84,6 @@ public:
   }
 
   void print() {
-    Serial.println("Point Estimator<x= " + String(getX()) + ", y= " + String(getY()) + ", angle= " + String(getHeading()) + ">");
+    Serial.println("Point Estimator<x=" + String(getX()) + ", y=" + String(getY()) + ", angle=" + String(getHeading()) + ">");
   }
 };

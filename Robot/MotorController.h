@@ -3,45 +3,48 @@
 #include <Arduino.h>
 #include <PID_v1.h>
 #include <math.h>
+#include <limits.h>
 #include "Constants.h"
-#include "PIDHelpers.h"
 #include "Motor.h"
 #include "Stopwatch.h"
+#include "PIDController.h"
 
 enum class ControlMode {
-   POSITION,
-   VELOCITY
+  POSITION,
+  VELOCITY
 };
 
 /**
- * A motor controller with positional and velocity control modes
+ * A motor controller with positional and velocity control modes.
+ * 
+ * Velocity control is achieved by ramping the positional setpoint
+ * in small increments.
  */
 class MotorController {
   private:
     Motor& _motor;
-    PID _controller;
-    Stopwatch _setpointTimer;
+    PIDController _controller;
     ControlMode _mode = ControlMode::VELOCITY;
-    double _sensedPosition = 0
-    double _motorPWMVal = 0;
-    double _targetPosition = 0
+    double _maxPosition = std::numeric_limits<double>::max();
     double _targetVelocity = 0;
     
   public:
     MotorController(Motor& motor, const PIDConstants& coeffs) :
       _motor(motor),
-      _controller(&_sensedPosition, &_motorPWMVal, &_targetPosition, coeffs.kp, coeffs.ki, coeffs.kd, DIRECT),
-      _setpointTimer()
+      _controller(coeffs, -SPEED_THROTTLE, SPEED_THROTTLE, POSITION_THRESHOLD_INCHES)
     {
-      _controller.SetMode(AUTOMATIC);
-      _controller.SetOutputLimits(-SPEED_THROTTLE, SPEED_THROTTLE);
-      _controller.SetSampleTime(PID_SAMPLE_PERIOD_MS);
     }
 
+    /**
+     * Sets the target position
+     */
     void setTargetPosition(double targetPositionInInches) {
-      _targetPosition = targetPositionInInches;
+      _controller.SetSetpoint(targetPositionInInches);
     }
 
+    /**
+     * Sets the target position (only works in VELOCITY control mode)
+     */
     void setTargetVelocity(double targetVelocity) {
        _targetVelocity = targetVelocity;
     }
@@ -62,66 +65,60 @@ class MotorController {
          rampTargetPosition();
        }
 
-      // _motorPWMVal is updated by the call to .Compute()
-      _sensedPosition = _motor.getInchesDriven();
-      _controller.Compute();
-      _motor.driveAtSpeed(_motorPWMVal);
-
-      // If the setpoint is far away, the motor hasn't settled
-      if (fabs(_sensedPosition - _targetPosition) > POSITION_THRESHOLD_INCHES) {
-        _setpointTimer.zeroOut();
-      }
+      double motorPWMValue = _controller.Compute(_motor.getInchesDriven());
+      _motor.driveAtSpeed(motorPWMValue);
     }
 
+    /**
+     * Reset the state of the controller (i.e., the setpoint and outputs). Does not modify the 
+     * control mode.
+     */
     void reset() {
-      setTargetPosition(0);
-      resetPIDOutput();
+      _motor.stop();
+      _controller.Reset();
       _motor.resetEncoder();
-      _setpointTimer.zeroOut();
+      _maxPosition = std::numeric_limits<double>::max();
     }
 
     bool reachedSetpoint() {
-      return _setpointTimer.getElapsedTime() >= SETTLING_TIME;
-    }
-
-   /**
-    * Opens a Serial-based dialog to adjust the PID constants of the motor controller
-    */
-    void adjustPIDConstants() {
-      PIDHelpers::adjustPIDConstants(_controller);
+      return _controller.ReachedSetpoint();
     }
 
     double getTargetPosition() {
-      return _targetPosition;
+      return _controller.GetSetpoint();
     }
 
     double getTargetVelocity() {
        return _targetVelocity;
     }
 
+    /**
+     * Set the maximum position setpoint. This parameter can be used to achieve a target
+     * positional setpoint in velocity control mode
+     */
+    void setMaxPosition(double maxPosition) {
+      _maxPosition = maxPosition;
+    }
+
     void print() {
-      Serial.println("Motor Controller: " + String(_motor.getInchesDriven()) + " in. -> " + String(_targetPosition) + " in."  + " @ PWM " + String(_motorPWMVal));
+      Serial.print("Motor ");
+      _controller.Print();
     }
 
 // Helper functions
 private:
-    /**
-     * Hack to reset the output of the PID controller to 0 and prevent
-     * build-up of the integral term between separate commands.
-     * See https://github.com/br3ttb/Arduino-PID-Library/issues/76#issuecomment-678644330
-     */
-    void resetPIDOutput() {
-      _controller.SetMode(MANUAL);
-      _motorPWMVal = 0;
-      _controller.SetMode(AUTOMATIC);
-    }
-
    /**
     * Ramp up the positional setpoint up based on the current target velocity and the
-    * time since the last update
+    * time since the last PID computation
     */
     void rampTargetPosition() {
-       double positionIncrement = _targetVelocity * _setpointTimer.lap();
-       setTargetPosition(_targetPosition + positionIncrement);
+       double positionIncrement = _targetVelocity * _controller.GetTimeDelta();
+       double nextPositionSetpoint = _controller.GetSetpoint() + positionIncrement;
+
+       Serial.println("dt, dpos: " + String(_controller.GetTimeDelta()) + ", " + String(positionIncrement));
+
+       if (nextPositionSetpoint <= _maxPosition) {
+          _controller.SetSetpoint(nextPositionSetpoint);
+       }
     }
 };
