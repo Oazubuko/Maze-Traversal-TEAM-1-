@@ -4,32 +4,22 @@
 #include "Motor.h"
 #include "Constants.h"
 #include "LineSensor.h"
-#include "MotorPositionController.h"
-#include "MotorVelocityController.h"
+#include "MotorController.h"
 #include "Songs.h"
 #include "Stopwatch.h"
 #include "Gyro.h"
 #include "PositionEstimator.h"
 
-// Turn Controller
+// TODO: refactor turnController into a class
 double sensedAngle, angularSpeed, targetAngle;
 PID turnController(&sensedAngle, &angularSpeed, &targetAngle, 0.2, 0, 0.05, DIRECT);
-
 Buzzer buzzer(10);
-
 LineSensor lineSensor(A3, A2);
-
 Motor leftMotor(3, 2, 6, 7);
 Motor rightMotor(4, 5, 9, 8);
-
-MotorPositionController leftPosController(leftMotor, LEFT_MOTOR_POSITION_CONSTANTS);
-MotorPositionController rightPosController(rightMotor, RIGHT_MOTOR_POSITION_CONSTANTS);
-
-MotorVelocityController leftVelocityController(leftMotor, leftPosController);
-MotorVelocityController rightVelocityController(rightMotor, rightPosController);
-
+MotorController leftMotorController(leftMotor, LEFT_MOTOR_POSITION_CONSTANTS);
+MotorController rightMotorController(rightMotor, RIGHT_MOTOR_POSITION_CONSTANTS);
 Gyro gyro;
-
 PositionEstimator posEstimator(leftMotor, rightMotor, gyro);
 
 // Forward Declarations
@@ -41,7 +31,6 @@ void centerOnJunction();
 
 void setup() {
   Serial.begin(9600);
-
   Songs::playStarWarsTheme(buzzer);
 
   gyro.begin();
@@ -51,8 +40,8 @@ void setup() {
   turnController.SetOutputLimits(-MAX_TURN_SPEED, MAX_TURN_SPEED);
   turnController.SetSampleTime(PID_SAMPLE_PERIOD_MS);
 
-  leftVelocityController.reset();
-  rightVelocityController.reset();
+  leftMotorController.reset();
+  rightMotorController.reset();
 }
 
 void loop() {
@@ -101,8 +90,8 @@ void turnAngle(double degrees) {
   rightMotor.stop();
   leftMotor.stop();
 
-  leftVelocityController.reset();
-  rightVelocityController.reset();
+  leftMotorController.reset();
+  rightMotorController.reset();
   
   sensedAngle = gyro.getAngle();
   targetAngle = sensedAngle + degrees;
@@ -116,11 +105,11 @@ void turnAngle(double degrees) {
     sensedAngle = gyro.getAngle();
 
     turnController.Compute();
-    leftVelocityController.setTargetVelocity(-angularSpeed);
-    rightVelocityController.setTargetVelocity(angularSpeed);
+    leftMotorController.setTargetVelocity(-angularSpeed);
+    rightMotorController.setTargetVelocity(angularSpeed);
 
-    leftVelocityController.update();
-    rightVelocityController.update();
+    leftMotorController.update();
+    rightMotorController.update();
 
     posEstimator.update();
 
@@ -144,17 +133,17 @@ void driveStraightForever() {
   float startAngle = gyro.getAngle();
   
   leftVelocityController.reset();
-  rightVelocityController.reset();
+  rightMotorController.reset();
 
   while (true) {
     double kp = 0.25;
     double angularAdjustment = (gyro.getAngle() - startAngle) * kp;
 
     leftVelocityController.setTargetVelocity(BASE_SPEED + angularAdjustment);
-    rightVelocityController.setTargetVelocity(BASE_SPEED - angularAdjustment);
+    rightMotorController.setTargetVelocity(BASE_SPEED - angularAdjustment);
 
     leftVelocityController.update();
-    rightVelocityController.update();
+    rightMotorController.update();
 
     posEstimator.update();
 
@@ -162,60 +151,71 @@ void driveStraightForever() {
   }
 }
 
+/**
+ * Drive straight a given number of inches
+ */
 void driveStraight(double inches) {
   Serial.println("Drive: " + String(inches) + "in.");
 
-  leftVelocityController.reset();
-  rightVelocityController.reset();
+  leftMotorController.reset();
+  rightMotorController.reset();
 
-  leftVelocityController.setTargetVelocity(BASE_SPEED);
-  rightVelocityController.setTargetVelocity(BASE_SPEED);
+  leftMotorController.setTargetVelocity(BASE_SPEED);
+  rightMotorController.setTargetVelocity(BASE_SPEED);
 
   
-  while (!leftPosController.reachedSetpoint() || !rightPosController.reachedSetpoint()) {
-    if (leftPosController.getTargetPosition() <= inches) {
-      leftVelocityController.update();
-    } else {
-      leftPosController.setTargetPosition(inches);
-      leftPosController.update();
+  while (!leftMotorController.reachedSetpoint() || !rightMotorController.reachedSetpoint()) {
+    if (leftMotorController.getTargetPosition() >= inches) {
+      leftMotorController.setControlMode(ControlMode::POSITION);
+      leftMotorController.setTargetPosition(inches);
     }
 
-    if (rightPosController.getTargetPosition() <= inches) {
-      rightVelocityController.update();
-    } else {
-      rightPosController.setTargetPosition(inches);
-      rightPosController.update();
+    if (rightMotorController.getTargetPosition() >= inches) {
+      rightMotorController.setControlMode(ControlMode::POSITION);
+      rightMotorController.setTargetPosition(inches);
     }
+
+    leftMotorController.update();
+    rightMotorController.update();
 
     posEstimator.update();
 
     delay(PID_SAMPLE_PERIOD_MS);
   }
+
+  leftMotorController.setControlMode(ControlMode::VELOCITY);
+  rightMotorController.setControlMode(ControlMode::VELOCITY);
 
   leftMotor.stop();
   rightMotor.stop();
 }
 
+/**
+ * Centers the robot's center of rotation on a newly-sensed junction
+ */
 void centerOnJunction() {
   Serial.println("Centering on junction");
   driveStraight(ROBOT_HEIGHT_INCHES);
 }
 
+/**
+ * Follow a line until a junction is reached.
+ */
 void driveUntilJunction() {
   Serial.println("Driving to Junction");
 
-  leftVelocityController.reset();
-  rightVelocityController.reset();
+  leftMotorController.reset();
+  rightMotorController.reset();
   
   while (lineSensor.identifyJunction() == Junction::LINE) {
     // Determine angular adjustment
     // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
     float skew = lineSensor.getSkew();
-    leftVelocityController.setTargetVelocity(BASE_SPEED - SKEW_ADJUSTMENT_FACTOR * skew);
-    rightVelocityController.setTargetVelocity(BASE_SPEED + SKEW_ADJUSTMENT_FACTOR * skew);
+    leftMotorController.setTargetVelocity(BASE_SPEED - SKEW_ADJUSTMENT_FACTOR * skew);
+    rightMotorController.setTargetVelocity(BASE_SPEED + SKEW_ADJUSTMENT_FACTOR * skew);
 
-    leftVelocityController.update();
-    rightVelocityController.update();
+    leftMotorController.update();
+    rightMotorController.update();
 
     posEstimator.update();
 

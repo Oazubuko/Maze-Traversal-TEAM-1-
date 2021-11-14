@@ -19,6 +19,7 @@ constexpr float SETTLING_TIME = 0.5; // Seconds
 constexpr float PID_TIMEOUT = 5; // Seconds
 
 // Speeds
+constexpr float SPEED_THROTTLE = 0.5; // % of max motor speed
 constexpr float BASE_SPEED = 13; // Inches / sec
 constexpr float SKEW_ADJUSTMENT_FACTOR = 4;
 constexpr float MAX_TURN_SPEED = 20; // Inches / sec
