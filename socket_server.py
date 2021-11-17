@@ -5,12 +5,12 @@ global TheMessage
 TheMessage = "None"
 
 
+
 class EchoServerProtocol(asyncio.Protocol):
 
     def __init__(self):
         self.nconn = 1
-        self.idMessage = id(TheMessage)
-        print("INIT %d"  %self.idMessage)
+        print("INIT " )
 
     def connection_made(self, transport):
         self.transport = transport
@@ -23,10 +23,16 @@ class EchoServerProtocol(asyncio.Protocol):
         print("server got Message: %s " %message)
         ipos = message.find('SDIR:')
         if ipos >= 0:
-            shortMessage = message[ipos+5:]
+            TheMessage = message[ipos+5:]
             self.transport.write(TheMessage.encode())
-            print(TheMessage)
-            TheMessage = shortMessage
+        else:
+            ipos=message.find("send SDIR")
+            if ipos >= 0:
+                sending = "SDIR:"+TheMessage
+                print("Sever sending %s " %sending)
+                self.transport.write(sending.encode())
+
+
 
 
 

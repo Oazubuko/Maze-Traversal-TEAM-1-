@@ -1,5 +1,5 @@
 #!/bin/bash
 
 
-sudo pkill -f bluetooth_test9
-pkill -f socket
+sudo pkill -f bluetooth_test10
+sudo pkill -f socket
