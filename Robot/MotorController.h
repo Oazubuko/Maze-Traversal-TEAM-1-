@@ -84,6 +84,10 @@ class MotorController {
       return _controller.ReachedSetpoint();
     }
 
+    bool reachedMaxPosition() {
+      return reachedSetpoint() && _controller.GetSetpoint() >= _maxPosition;
+    }
+
     double getTargetPosition() {
       return _controller.GetSetpoint();
     }
@@ -115,10 +119,6 @@ private:
        double positionIncrement = _targetVelocity * _controller.GetTimeDelta();
        double nextPositionSetpoint = _controller.GetSetpoint() + positionIncrement;
 
-       Serial.println("dt, dpos: " + String(_controller.GetTimeDelta()) + ", " + String(positionIncrement));
-
-       if (nextPositionSetpoint <= _maxPosition) {
-          _controller.SetSetpoint(nextPositionSetpoint);
-       }
+       _controller.SetSetpoint(min(nextPositionSetpoint, _maxPosition));
     }
 };

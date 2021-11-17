@@ -16,6 +16,7 @@ class PIDController : public PID
     double _input = 0;
     double _output = 0;
     double _setpoint = 0;
+    double _timeAtSetpoint = 0;
     double _errorTolerance;
 
   public:
@@ -47,10 +48,11 @@ class PIDController : public PID
     */
     double Compute(double nextInput) {
       // If the setpoint is far away, the plant hasn't settled
+      float dt = _setpointTimer.lap();
       if (fabs(_input - _setpoint) > _errorTolerance) {
-        _setpointTimer.zeroOut();
+        _timeAtSetpoint = 0;
       } else {
-        _setpointTimer.lap();
+        _timeAtSetpoint += dt;
       }
 
       // PID::Compute() automatically updates _output based on current error
@@ -71,7 +73,7 @@ class PIDController : public PID
        Whether the plant has settled on the setpoint for long enough
     */
     bool ReachedSetpoint() {
-      return _setpointTimer.getElapsedTime() >= SETTLING_TIME;
+      return _timeAtSetpoint >= SETTLING_TIME || _setpointTimer.getElapsedTime() >= PID_TIMEOUT;
     }
 
     /**
@@ -85,6 +87,7 @@ class PIDController : public PID
       _output = 0;
       _input = 0;
       _setpoint = 0;
+      _timeAtSetpoint = 0;
       PID::SetMode(AUTOMATIC);
 
       _setpointTimer.zeroOut();

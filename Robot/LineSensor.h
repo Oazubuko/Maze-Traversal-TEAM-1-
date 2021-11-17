@@ -10,6 +10,17 @@
 #include <cstdint>
 #include "Junction.h"
 
+/**
+ * The tape orientations that the line sensor can detect
+ */
+enum class LineReading {
+  EMPTY,    // No tape seen
+  CENTERED, // Tape only seen on the middle sensors
+  LEFT,     // Tape only seen on the left side
+  RIGHT,    // Tape only seen on the right side
+  FULL      // Tape seen on both sides
+};
+
 class LineSensor {
   public:
     constexpr static uint8_t SENSOR_COUNT = 13;
@@ -18,8 +29,8 @@ class LineSensor {
     constexpr static uint8_t CENTER_RIGHT_PIN = 6;
     constexpr static uint8_t CENTER_PIN = 7;
     constexpr static uint8_t CENTER_LEFT_PIN = 8;
-    constexpr static int JUNCTION_TAPE_COUNT = 4;
-    constexpr static int MAX_TAPE_REFLECTANCE = 690; // Reflectance values <= to this will be considered tape
+    constexpr static int TAPE_COUNT_THRESHOLD = 4;
+    constexpr static int MAX_TAPE_REFLECTANCE = 575; // Reflectance values <= to this will be considered tape
 
     uint8_t _leftADCPin;
     uint8_t _rightADCPin;
@@ -35,7 +46,7 @@ class LineSensor {
     {}
 
     /**
-     * Attaches the 
+     * Initializes the underlying ADCs for the line sensor
      */
     void begin() {
       _leftADC.begin(_leftADCPin);
@@ -117,7 +128,8 @@ class LineSensor {
     }
 
     /**
-     * An alternate algorithm for calculating skew that gives extra weight to the one
+     * An alternate algorithm for calculating skew that gives extra weight to reflectance
+     * sensors farther away from the center.
      * Again, skew is a value from [-1, 1]
      */
     float getSkew2() {
@@ -152,23 +164,23 @@ class LineSensor {
     }
 
     // Looks at the tape 
-    Junction identifyJunction() {
+    LineReading getReading() {
       if (cantSeeAnyTape()) {
-        return Junction::DEAD_END;
+        return LineReading::EMPTY;
       }
 
-      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT;
-      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT;
+      bool foundLeftTape = countLeftTape() > TAPE_COUNT_THRESHOLD;
+      bool foundRightTape = countRightTape() > TAPE_COUNT_THRESHOLD;
 
-      if (foundRightJunction && foundLeftJunction) {
-        return Junction::T;
-      } else if (foundRightJunction) {
-        return Junction::RIGHT;
-      } else if (foundLeftJunction) {
-        return Junction::LEFT;
+      if (foundRightTape && foundLeftTape) {
+        return LineReading::FULL;
+      } else if (foundRightTape) {
+        return LineReading::RIGHT;
+      } else if (foundLeftTape) {
+        return LineReading::LEFT;
       }
 
-      return Junction::LINE;
+      return LineReading::CENTERED;
     }
 
     // Here is some extra logic to perform sensor calibration. It turns out that it isn't needed

@@ -3,6 +3,11 @@
 #include <cstdint>
 #include <Arduino.h>
 
+// Pins
+constexpr uint8_t BUZZER_PIN = 10;
+
+constexpr uint16_t PRINT_DELAY_MS = 250;
+
 // Calculating Encoder Ticks -> Inches
 constexpr float ENCODER_TICKS_PER_INCH = 84.91667; // TODO: improve
 constexpr float POSITION_THRESHOLD_INCHES = 1;
@@ -16,11 +21,11 @@ typedef struct PIDConstants_t {
 constexpr PIDConstants LEFT_MOTOR_POSITION_CONSTANTS = { 0.125, 0.01, 0.01 };
 constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.11, 0.01, 0.0075 };
 constexpr PIDConstants TURN_CONSTANTS = { 0.075, 0, 0 };
-constexpr int PID_SAMPLE_PERIOD_MS = 20;
-constexpr float DISTANCE_THRESHOLD_INCHES = 0.8;
+constexpr int PID_SAMPLE_PERIOD_MS = 5;
+constexpr float DISTANCE_THRESHOLD_INCHES = 0.5;
 constexpr float DEGREE_THRESHOLD = 2;
 constexpr float SETTLING_TIME = 0.25; // Seconds
-constexpr float PID_TIMEOUT = 5; // Seconds
+constexpr float PID_TIMEOUT = 1; // Seconds
 
 constexpr float SKEW_ADJUSTMENT_FACTOR = 4;
 constexpr float ANGLE_ADJUSTMENT_FACTOR = 0.2;

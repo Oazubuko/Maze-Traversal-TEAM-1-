@@ -11,18 +11,11 @@
  */
 class Gyro {
   private:
-    float _currentAngle;
+    float _currentAngle = 0;
     Stopwatch _integrationTimer;
-    float _gyroBias;
+    float _gyroBias = 0;
         
   public:
-    Gyro() :
-      _currentAngle(0),
-      _integrationTimer(),
-      _gyroBias(0)
-    {
-    }
-
     /**
      * Initializes the IMU and calibrates the Gyro.
      * Always call this function before use!
@@ -69,6 +62,10 @@ class Gyro {
 
       zeroOut();
     }
+    
+    float getAngle() {    
+      return _currentAngle;
+    }
 
     void zeroOut() {
       _currentAngle = 0;
@@ -78,16 +75,12 @@ class Gyro {
     /**
      * Computes and returns the angle in degrees using Euler's Method
      */
-    float getAngle() {
-      if (!IMU.gyroscopeAvailable()) {
-        return _currentAngle;
+    void update() {
+      if (IMU.gyroscopeAvailable()) {
+        _currentAngle += getAngularSpeed() * _integrationTimer.lap();
       }
-
-      // angle ~= angle + (current angular speed) * dt
-      _currentAngle += getAngularSpeed() * _integrationTimer.lap();
-    
-      return _currentAngle;
     }
+
 
     /**
      * Returns how fast the robot is turning in the z-direction in degrees per second. Removes
