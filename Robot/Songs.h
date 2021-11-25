@@ -35,8 +35,6 @@ namespace Songs {
     playSound(NOTE_F3, 375);
     playSound(NOTE_C4, 125);
     playSound(NOTE_A3, 1000);
-    
-    buzzer.end(100);
   }
 
   void playMarioTheme() {
@@ -54,7 +52,122 @@ namespace Songs {
     playSound(0, 240);
     playSound(NOTE_G6, 80);
     playSound(0, 240);
+  }
+
+  void playJingleBells() {
+    int time = 500;
+
+    buzzer.begin(10);
+  
+    playSound(NOTE_G3, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_C4, time / 2);
+    playSound(NOTE_G3, time * 2);
     
-    buzzer.end(100);
+    playSound(NOTE_G3, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_C4, time / 2);
+    playSound(NOTE_A4, time * 2);
+  
+    playSound(NOTE_A4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_G4, time);
+    playSound(NOTE_G4, time);
+    
+    playSound(NOTE_A5, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_E4, time * 2);
+    
+    playSound(NOTE_G3, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_C4, time / 2);
+    playSound(NOTE_G3, time * 2);
+    
+    playSound(NOTE_G3, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_C4, time / 2);
+    playSound(NOTE_A4, time * 2);
+    
+    playSound(NOTE_A4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_G4, (time * 3) / 4);
+    playSound(NOTE_G4, time / 4);
+    
+    playSound(NOTE_A5, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_C4, time * 2);
+  
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time);
+    
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_C4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_E4, time * 2);
+    
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 4);
+    playSound(NOTE_E4, time / 4);
+  
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_D4, time);
+    playSound(NOTE_G4, time);
+  
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time);
+    
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_C4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_E4, time * 2);
+    
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 2);
+    playSound(NOTE_E4, time / 4);
+    playSound(NOTE_E4, time / 4);
+    
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_G4, time / 2);
+    playSound(NOTE_F4, time / 2);
+    playSound(NOTE_D4, time / 2);
+    playSound(NOTE_C4, time * 2);
   }
 };

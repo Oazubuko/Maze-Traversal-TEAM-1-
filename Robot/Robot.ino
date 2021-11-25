@@ -11,7 +11,6 @@
 #include "Gyro.h"
 #include "PositionEstimator.h"
 #include "StateMachine.h"
-#include "Errors.h"
 
 State state = State::FOLLOWING_LINE;
 
@@ -119,13 +118,19 @@ void loop() {
 
 // State transitions
 State followingLineNextState(LineReading lineReading) {
-  if (lineReading != LineReading::CENTERED) return State::IDENTIFYING_JUNCTION;
+  if (lineReading != LineReading::LINE) return State::IDENTIFYING_JUNCTION;
   
   return State::FOLLOWING_LINE;
 }
 
 State identifyingJunctionNextState() {
-  if (junctionIDState == JunctionIDState::DONE) return State::TURNING;
+  if (junctionIDState == JunctionIDState::DONE) {
+    if (identifiedJunction == Junction::END_OF_MAZE) {
+      return State::FINISHED;
+    } else {
+      return State::TURNING;
+    }
+  }
 
   return State::IDENTIFYING_JUNCTION;
 }
@@ -164,23 +169,46 @@ void identifyingJunctionActions(LineReading latestLineReading) {
     // Actions + State Exit Conditions: Based on the last line sensor reading
     firstLineReading = latestLineReading;
 
-    if (latestLineReading == LineReading::EMPTY) {
-      // Empty line readings are always dead ends on init
-      identifiedJunction = Junction::DEAD_END;
-      junctionIDState = JunctionIDState::DONE;
-      playToneFor(identifiedJunction);
-    } else {
-      // Center the robot's rotation point on the middle of the junction. There,
-      // we'll take the final measurement to disambiguate the junction type
-      leftMotorController.reset();
-      rightMotorController.reset();
+    switch(latestLineReading) {
+      // Empty line readings are always dead ends
+      case LineReading::EMPTY:
+        identifiedJunction = Junction::DEAD_END;
+        junctionIDState = JunctionIDState::DONE;
+        playToneFor(identifiedJunction);
+        break;
 
-      headingAngle = gyro.getAngle();
+      // End of mazes don't need any additional checks
+      case LineReading::END_OF_MAZE:
+        identifiedJunction = Junction::END_OF_MAZE;
+        junctionIDState = JunctionIDState::DONE;
+        playToneFor(identifiedJunction);
+        break;
 
-      leftMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
-      rightMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
+      // A single is ambiguous, so we need to get another check
+      // before determining the junction type
+      case LineReading::FULL:
+      case LineReading::LEFT:
+      case LineReading::RIGHT:
+        // Center the robot's rotation point on the middle of the junction. There,
+        // we'll take the final measurement to disambiguate the junction type
+        leftMotorController.reset();
+        rightMotorController.reset();
+  
+        headingAngle = gyro.getAngle();
+  
+        leftMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
+        rightMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
+        
+        junctionIDState = JunctionIDState::CENTERING_ON_JUNCTION;
       
-      junctionIDState = JunctionIDState::CENTERING_ON_JUNCTION;
+      case LineReading::LINE:
+        handleFatalError("You shouldn't be identifying a line junction");
+        break;
+        
+      case LineReading::UNKNOWN:
+      default:
+        handleFatalError("Found an impossible line reading!!!");
+        break;
     }
   }
 
@@ -240,7 +268,7 @@ void turningActions() {
 }
 
 void finishedActions() {
-  // Do nothing when we finished the maze :)
+  Songs::playJingleBells();  
 }
 
 /**
@@ -259,12 +287,16 @@ Junction determineJunction(LineReading firstReading, LineReading lastReading) {
 
     // This function usually is never called with the following first readings
     // because the last reading has no influence on their behavior
-    case LineReading::CENTERED:
+    case LineReading::LINE:
       return Junction::LINE;
 
     case LineReading::EMPTY:
       return Junction::DEAD_END;
 
+    case LineReading::END_OF_MAZE:
+      return Junction::END_OF_MAZE;
+
+    case LineReading::UNKNOWN:
     default:
       handleFatalError("Invalid line reading found while determining the junction");
       return Junction::DEAD_END;
@@ -320,6 +352,7 @@ int getToneFor(Junction junction) {
     case Junction::T: return NOTE_G7;
     case Junction::PLUS: return NOTE_C8;
     case Junction::LINE: return NOTE_E8;
+    case Junction::END_OF_MAZE: return NOTE_F8;
     default: return NOTE_G8;
   }
 }
@@ -366,5 +399,19 @@ void printStatus() {
     if (prevStates.empty() || prevStates.back() != state) {
       prevStates.push_back(state);
     }
+  }
+}
+
+/**
+ * Enter an error state until the end of time! Spooky.
+ */
+void handleFatalError(String errorMessage) {
+  leftMotor.stop();
+  rightMotor.stop();
+  
+  while (true) {
+    Serial.println("Encountered a fatal error: " + errorMessage);
+    Songs::playMarioTheme();
+    delay(1000);
   }
 }
