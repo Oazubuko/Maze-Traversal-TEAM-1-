@@ -3,10 +3,11 @@
 #include <cstdint>
 #include <Arduino.h>
 
+// Misc. Constants
+constexpr uint16_t PRINT_DELAY_MS = 500;
+
 // Pins
 constexpr uint8_t BUZZER_PIN = 10;
-
-constexpr uint16_t PRINT_DELAY_MS = 250;
 
 // Calculating Encoder Ticks -> Inches
 constexpr float ENCODER_TICKS_PER_INCH = 84.91667; // TODO: improve
