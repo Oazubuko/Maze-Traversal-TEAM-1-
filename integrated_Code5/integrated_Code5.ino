@@ -123,16 +123,20 @@ String FirstMazeRun()
    bool NotFinished = true;
    String directions="";
 
-   //while(NotFinished)
-   for(int i=0;i<28;i++)
+   //for(int i=0;i<28;i++)
+   while(NotFinished)
    {
   
        Junction junction = lineSensor.identifyJunction();
        Serial.println(junctionAsString(junction));
        //Seperate Out dicisions requiring two reading from decisions requiring only one
-       if( (junction==Junction::DEAD_END)||(junction==Junction::LINE) )//Need address case of unknown value
+       if( (junction==Junction::DEAD_END)||(junction==Junction::LINE)||(junction==Junction::END_OF_MAZE) )//Need address case of unknown value
        {
-            if(junction==Junction::DEAD_END) 
+            if(junction==Junction::END_OF_MAZE)
+            {
+                NotFinished = false;
+            }
+            else if(junction==Junction::DEAD_END) 
             {
                 buzzer.sound(NOTE_E7, 200);
                 turnAngle(180);
@@ -195,7 +199,9 @@ String FirstMazeRun()
             }
        }//Junction requires two step decision process
        
-   }//End of for(int i=0;i<28;i++)
+   }//End of while(NotFinished)
+   //Triggers after End of Maze detected in order to drive into goal area
+   driveStraight(4.0);
    return(directions);
 }//End of String FirstMazeRun()
 
@@ -207,6 +213,7 @@ void OptimizedMazeRun()
   {
       driveUntilJunction();
       char current=directions.charAt(i);
+      Serial.print(directions);
       Serial.print("current = ");
       Serial.println(current);
   
@@ -226,14 +233,7 @@ void OptimizedMazeRun()
           case 'L':
             buzzer.sound(NOTE_B7, 200);
             centerOnJunction();
-
-            // If this is a + junction, and not a left junction, 
-            // don't bother turning
-            if (lineSensor.identifyJunction() == Junction::DEAD_END) 
-            {
-               turnAngle(90);
-            }//End of if (lineSensor.identifyJunction() == Junction::DEAD_END)
-      
+            turnAngle(90);
           break;//case 'L':
 
           case 'S':
@@ -244,7 +244,10 @@ void OptimizedMazeRun()
       }//End of switch (junction)
 
   }//End of for(int i=0;i<len;i++)
+  //
   driveUntilJunction();
+  //Triggers after End of Maze detected in order to drive into goal area
+  driveStraight(4.0);
 }//void OptimizedMazeRun()
 
 /**
