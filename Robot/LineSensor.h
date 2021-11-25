@@ -32,7 +32,10 @@ class LineSensor {
     constexpr static uint8_t CENTER_PIN = 7;
     constexpr static uint8_t CENTER_LEFT_PIN = 8;
     constexpr static int TAPE_COUNT_THRESHOLD = 4;
-    constexpr static int MAX_TAPE_REFLECTANCE = 690; // Reflectance values <= to this will be considered tape
+
+    // Reflectance values <= to this will be considered tape. Recalibrated each time
+    // the sensor is initialized
+    int MAX_TAPE_REFLECTANCE = -1;
 
     uint8_t _leftADCPin;
     uint8_t _rightADCPin;
@@ -48,11 +51,13 @@ class LineSensor {
     {}
 
     /**
-       Initializes the underlying ADCs for the line sensor
+       Initializes the underlying ADCs for the line sensor & calibrates the line sensor.
     */
     void begin() {
       _leftADC.begin(_leftADCPin);
       _rightADC.begin(_rightADCPin);
+
+      calibrate();
     }
 
     /**
@@ -88,6 +93,33 @@ class LineSensor {
 
     bool isSensorAboveTape(int sensorIndex) {
       return getReflectanceAt(sensorIndex) < MAX_TAPE_REFLECTANCE;
+    }
+
+    bool centeredOnTape() {
+      return isSensorAboveTape(CENTER_PIN);
+    }
+
+    /**
+       Returns the number of sensors with tape between the start and end index (inclusive)
+    */
+    int countTapeBetween(int startIndex, int endIndex) {
+      int tapeCount = 0;
+
+      for (int i = startIndex; i <= endIndex; i++) {
+        if (isSensorAboveTape(i)) {
+          tapeCount++;
+        }
+      }
+
+      return tapeCount;
+    }
+
+    int countRightTape() {
+      return countTapeBetween(1, CENTER_PIN - 1);
+    }
+
+    int countLeftTape() {
+      return countTapeBetween(CENTER_PIN + 1, SENSOR_COUNT);
     }
 
     /**
@@ -138,6 +170,7 @@ class LineSensor {
       Serial.println();
     }
 
+    // Looks at the tape
     LineReading getReading() {
       int tapeCount = countTapeBetween(1, SENSOR_COUNT);
       int leftTapeCount = countLeftTape();
@@ -197,47 +230,60 @@ class LineSensor {
       return countTapeBetween(CENTER_PIN + 1, SENSOR_COUNT);
     }
 
-    // Here is some extra logic to perform sensor calibration. It turns out that it isn't needed
-    // since the sensors are more accurate than I thought, but I wanted to leave this code here in case
-    // I need it later
+    /**
+       Determine the value below which a sensor reading will be considered white tape.
 
-    // constexpr static int NUM_CALIBRATION_SAMPLES = 20;
-    // int tapeCutoffs[SENSOR_COUNT + 1];
-    // /**
-    //  * Since each reflectance sensor is different, sample values from each
-    //  * sensor to calculate the value below which a sensor reading will be considered white tape.
-    //  * For proper calibration, place the robot on a black surface while this function is being called.
-    //  */
-    // void calibrateTapeCutoffs() {
-    //   Serial.println("Calculating tape cutoffs...");
+       This is needed to handle different levels of ambient light.
 
-    //   for (int i = 0; i < NUM_CALIBRATION_SAMPLES; i++) {
-    //     for (int j = 1; j <= SENSOR_COUNT; j++) {
-    //       tapeCutoffs[j] += getReflectanceAt(j);
-    //     }
-    //     delay(100);
-    //   }
+       For proper calibration, place the center reflectance sensor above tape while this 
+       function is being called (see the diagram below):
+                        |_______
+                        |       |
+              ===TAPE===| ROBOT |======
+                        |_______|
+                        |
+    */
+    void calibrate() {      
+      Serial.println("Calculating tape cutoff threshold...");
 
-    //   // Compute the average reflectance value for each
-    //   for (int i = 1; i <= SENSOR_COUNT; i++) {
-    //     tapeCutoffs[i] /= NUM_CALIBRATION_SAMPLES;
+      constexpr int NUM_SAMPLES = 100;
 
-    //     // Any value that is below 95% of the average reflectance value counts as tape
-    //     tapeCutoffs[i] *= 0.95;
-    //   }
-    //   Serial.println("Finished calculating tape cutoffs...");
-    // }
+      float nonTapeReflectance = 0;
+      float tapeReflectance = 0;
 
-    // void printTapeCutoffs() {
-    //   Serial.println("Light Sensor Cutoffs: ");
+      for (int i = 1; i <= NUM_SAMPLES; i++) {
+        // Center pin is above white tape
+        tapeReflectance += getReflectanceAt(CENTER_PIN);
 
-    //   for (int i = 1; i <= SENSOR_COUNT; i++) {
-    //     Serial.print(i);
-    //     Serial.print(": ");
-    //     Serial.print(tapeCutoffs[i]);
-    //     Serial.print("\t");
-    //   }
+        // Non-Center Pins arent above white tape
+        float rightReflectance = averageReflectanceBetween(1, CENTER_PIN - 2);
+        float leftReflectance = averageReflectanceBetween(CENTER_PIN + 2, SENSOR_COUNT);
+        nonTapeReflectance += (leftReflectance + rightReflectance) / 2;
 
-    //   Serial.println();
-    // }
+        Serial.println("Average Tape: " + String(tapeReflectance / i));
+        Serial.println("Average Not Tape: " + String(nonTapeReflectance / i));
+
+        delay(10);
+      }
+
+      // Set the threshold a little below the midpoint of the average reflectance values
+      float totalReflectance = (tapeReflectance + nonTapeReflectance) / NUM_SAMPLES;
+      MAX_TAPE_REFLECTANCE = static_cast<int>(totalReflectance * 0.40);
+
+      Serial.println("Finished calculating tape cutoff: " + String(MAX_TAPE_REFLECTANCE));
+    }
+
+    /**
+       The average reflectance value between the start and end pin inclusive
+    */
+    float averageReflectanceBetween(int startPin, int endPin) {
+      float totalReflectance = 0;
+      int numSamples = endPin - startPin + 1;
+
+      for (int pin = startPin; pin <= endPin; pin++) {
+        totalReflectance += getReflectanceAt(pin);
+      }
+
+      return totalReflectance / numSamples;
+    }
 };
