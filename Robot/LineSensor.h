@@ -95,33 +95,6 @@ class LineSensor {
       return getReflectanceAt(sensorIndex) < MAX_TAPE_REFLECTANCE;
     }
 
-    bool centeredOnTape() {
-      return isSensorAboveTape(CENTER_PIN);
-    }
-
-    /**
-       Returns the number of sensors with tape between the start and end index (inclusive)
-    */
-    int countTapeBetween(int startIndex, int endIndex) {
-      int tapeCount = 0;
-
-      for (int i = startIndex; i <= endIndex; i++) {
-        if (isSensorAboveTape(i)) {
-          tapeCount++;
-        }
-      }
-
-      return tapeCount;
-    }
-
-    int countRightTape() {
-      return countTapeBetween(1, CENTER_PIN - 1);
-    }
-
-    int countLeftTape() {
-      return countTapeBetween(CENTER_PIN + 1, SENSOR_COUNT);
-    }
-
     /**
        Return a skew value that summarizes how much the line sensor is misaligned with the
        tape below. Skew ranges from [-1, +1]. Positive values indicate that the sensor is
@@ -154,14 +127,6 @@ class LineSensor {
       return skew / MAX_SKEW_PER_SIDE;
     }
 
-    bool cantSeeAnyTape() {
-      for (int i = 1; i <= SENSOR_COUNT; i++) {
-        if (isSensorAboveTape(i)) return false;
-      }
-
-      return true;
-    }
-
     void printAllSensorValues() {
       for (int i = SENSOR_COUNT; i >= 1; i--) {
         Serial.print(getReflectanceAt(i));
@@ -170,7 +135,9 @@ class LineSensor {
       Serial.println();
     }
 
-    // Looks at the tape
+    /**
+     * Summarizes a reading from the line sensor
+     */
     LineReading getReading() {
       int tapeCount = countTapeBetween(1, SENSOR_COUNT);
       int leftTapeCount = countLeftTape();
@@ -178,32 +145,52 @@ class LineSensor {
       
       LineReading reading = LineReading::UNKNOWN;
 
-
-      Serial.println("Left, Right, Total: " + String(leftTapeCount) + ", " + String(rightTapeCount) + ", " + String(tapeCount));
-      Serial.print("Line reading ");
+//      Serial.println("Left, Right, Total: " + String(leftTapeCount) + ", " + String(rightTapeCount) + ", " + String(tapeCount));
+//      printAllSensorValues();
 
       // Determine sensor result based on the location of the tape
       if (tapeCount == 0) {
-        Serial.println("Empty");
         reading =  LineReading::EMPTY;
       } else if (1 <= tapeCount && tapeCount <= 3) {
-        Serial.println("Line");
         reading = LineReading::LINE;
       } else if (tapeCount >= 7 && !isSensorAboveTape(1) && !isSensorAboveTape(2) && !isSensorAboveTape(12) && !isSensorAboveTape(13)) {
-        Serial.println("End of maze");
         reading =  LineReading::END_OF_MAZE;
       } else if (tapeCount >= 10) {
-        Serial.println("Full");
         reading = LineReading::FULL;
       } else if (leftTapeCount >= 4 && rightTapeCount <= 2) {
-        Serial.println("Left");
         reading = LineReading::LEFT;
       } else if (rightTapeCount >= 4 && leftTapeCount <= 2) {
-        Serial.println("Right");
         reading = LineReading::RIGHT;
       }
 
       return reading;
+    }
+
+    static void printLineReading(LineReading lineReading) {
+      switch (lineReading)
+      {
+      case LineReading::EMPTY:
+        Serial.println("Empty");
+        break;
+      case LineReading::LINE:
+        Serial.println("Line");
+        break;
+      case LineReading::END_OF_MAZE:
+        Serial.println("End of Maze");
+        break;
+      case LineReading::FULL:
+        Serial.println("Full");
+        break;
+      case LineReading::LEFT:
+        Serial.println("Left");
+        break;
+      case LineReading::RIGHT:
+        Serial.println("Right");
+        break;
+      case LineReading::UNKNOWN:      
+      default:
+        Serial.println("Unknown");
+      }
     }
 
   private:
@@ -223,11 +210,11 @@ class LineSensor {
     }
 
     int countRightTape() {
-      return countTapeBetween(1, CENTER_PIN - 1);
+      return countTapeBetween(1, CENTER_RIGHT_PIN);
     }
 
     int countLeftTape() {
-      return countTapeBetween(CENTER_PIN + 1, SENSOR_COUNT);
+      return countTapeBetween(CENTER_LEFT_PIN, SENSOR_COUNT);
     }
 
     /**
@@ -266,9 +253,9 @@ class LineSensor {
         delay(10);
       }
 
-      // Set the threshold a little below the midpoint of the average reflectance values
-      float totalReflectance = (tapeReflectance + nonTapeReflectance) / NUM_SAMPLES;
-      MAX_TAPE_REFLECTANCE = static_cast<int>(totalReflectance * 0.40);
+      // Set the cutoff threshold at the midpoint of the reflectance values
+      float middleReflectance = (tapeReflectance + nonTapeReflectance) / NUM_SAMPLES / 2;
+      MAX_TAPE_REFLECTANCE = static_cast<int>(middleReflectance);
 
       Serial.println("Finished calculating tape cutoff: " + String(MAX_TAPE_REFLECTANCE));
     }

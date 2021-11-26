@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <Arduino.h>
+#include <Buzzer.h>
 
 // Misc. Constants
 constexpr uint16_t PRINT_DELAY_MS = 500;
+constexpr int ERROR_SOUND = NOTE_D5;
 
 // Pins
 constexpr uint8_t BUZZER_PIN = 10;
