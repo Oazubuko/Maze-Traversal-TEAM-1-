@@ -154,23 +154,36 @@ class LineSensor {
     // Looks at the tape 
     Junction identifyJunction() 
     {
-      if (cantSeeAnyTape()) {
-        return Junction::DEAD_END;
-      }
+        if (cantSeeAnyTape()) 
+        {
+            return Junction::DEAD_END;
+        }//End of if (cantSeeAnyTape())
 
-      bool foundLeftJunction = countLeftTape() > JUNCTION_TAPE_COUNT;
-      bool foundRightJunction = countRightTape() > JUNCTION_TAPE_COUNT;
+        int numLeft = countLeftTape();
+        int numRight = countRightTape();
+        int tapeCount = numRight+numLeft;
+        bool foundLeftJunction = numLeft > JUNCTION_TAPE_COUNT;
+        bool foundRightJunction = numRight > JUNCTION_TAPE_COUNT;
 
-      if (foundRightJunction && foundLeftJunction) {
-        return Junction::T;
-      } else if (foundRightJunction) {
-        return Junction::RIGHT;
-      } else if (foundLeftJunction) {
-        return Junction::LEFT;
-      }
+        if( (tapeCount>=4)&&(tapeCount<8)&&(numLeft>=2)&&(numLeft<=4)&&(numRight>=2)&&(numRight<=4) )
+        {
+            return Junction::END_OF_MAZE;
+        }
+        else if (foundRightJunction && foundLeftJunction) 
+        {
+           return Junction::T;
+        } 
+        else if (foundRightJunction) 
+        {
+            return Junction::RIGHT;
+        } 
+        else if (foundLeftJunction) 
+        {
+           return Junction::LEFT;
+        }
 
-      return Junction::LINE;
-    }
+        return Junction::LINE;
+    }//End of Junction identifyJunction()
 
     // Here is some extra logic to perform sensor calibration. It turns out that it isn't needed
     // since the sensors are more accurate than I thought, but I wanted to leave this code here in case
