@@ -13,6 +13,13 @@
 #include "StateMachine.h"
 
 State state = State::FOLLOWING_LINE;
+int loopCount = 0;
+
+// Track the most recent line reading and how frequent it is
+struct LineHistory {
+  LineReading lastReading;
+  int occurences;
+} lineHistory;
 
 // Turning FSMs
 enum class TurnState {INIT, TURNING, DONE};
@@ -30,8 +37,10 @@ Motor leftMotor(3, 2, 6, 7);
 Motor rightMotor(4, 5, 9, 8);
 MotorController leftMotorController(leftMotor, LEFT_MOTOR_POSITION_CONSTANTS);
 MotorController rightMotorController(rightMotor, RIGHT_MOTOR_POSITION_CONSTANTS);
+PIDController turnController(TURN_CONSTANTS, -MAX_TURN_SPEED, MAX_TURN_SPEED, DEGREE_THRESHOLD);
 Gyro gyro;
 PositionEstimator posEstimator(leftMotor, rightMotor, gyro);
+Stopwatch fsmTimer;
 
 // Forward Declarations
 void playToneFor(Junction junction, unsigned int duration = 50);
@@ -40,6 +49,10 @@ int pickTurnDirection();
 void printStatus();
 void updateMotorSpeeds(double leftSpeed, double rightSpeed);
 Junction determineJunction(LineReading firstReading, LineReading lastReading);
+void printStates(std::vector<State>& states);
+void turnAngle(double degrees);
+void handleFatalError(String errorMessage);
+void updateLineSensorHistory();
 
 void setup() {
   Serial.begin(9600);
@@ -50,6 +63,8 @@ void setup() {
 
   leftMotorController.reset();
   rightMotorController.reset();
+
+  fsmTimer.zeroOut();
 }
 
 /**
@@ -58,9 +73,9 @@ void setup() {
    2. Transition to a new state based on the sensor readings
    3. Output the appropriate signals based on our current state + inputs
 */
-void loop() {
-
+void loop() {  
   // Read sensors
+  updateLineSensorHistory();
   LineReading lineReading = lineSensor.getReading();
   LineSensor::printLineReading(lineReading);
   gyro.update();
@@ -104,7 +119,7 @@ void loop() {
       break;
 
     case State::FINISHED:
-      turningActions();
+      finishedActions();
       break;
 
     default:
@@ -114,9 +129,10 @@ void loop() {
 
   printStatus();
 
+  loopCount++;
+
   delay(PID_SAMPLE_PERIOD_MS);
 }
-
 
 // State transitions
 State followingLineNextState(LineReading lineReading) {
@@ -171,9 +187,12 @@ void identifyingJunctionActions(LineReading latestLineReading) {
 
   if (junctionIDState == JunctionIDState::INIT) {
     // Actions + State Exit Conditions: Based on the last line sensor reading
+    leftMotorController.reset();
+    rightMotorController.reset();
+
     firstLineReading = latestLineReading;
 
-    switch (latestLineReading) {
+    switch (firstLineReading) {
       // Empty line readings are always dead ends
       case LineReading::EMPTY:
         identifiedJunction = Junction::DEAD_END;
@@ -181,9 +200,9 @@ void identifyingJunctionActions(LineReading latestLineReading) {
         playToneFor(identifiedJunction);
         break;
 
-      // End of mazes don't need any additional checks
-      case LineReading::END_OF_MAZE:
-        identifiedJunction = Junction::END_OF_MAZE;
+      case LineReading::LINE:
+        Serial.println("Anakin, you were supposed to follow the lines, not identify them!");
+        identifiedJunction = Junction::LINE;
         junctionIDState = JunctionIDState::DONE;
         playToneFor(identifiedJunction);
         break;
@@ -191,33 +210,30 @@ void identifyingJunctionActions(LineReading latestLineReading) {
       // Unknown junctions are tricky to deal with--let's just play an error
       // tone and treat it like a line
       case LineReading::UNKNOWN:
+        Serial.println("Encountered unknown junction--treating it as a line");
         identifiedJunction = Junction::LINE;
         junctionIDState = JunctionIDState::DONE;
-        playToneFor(identifiedJunction);
+        Songs::playErrorSong();
         break;
 
-      // A single is ambiguous, so we need to get another check
+      // A single one of these readings is ambiguous, so we need to get another check
       // before determining the junction type
       case LineReading::FULL:
       case LineReading::LEFT:
       case LineReading::RIGHT:
+      case LineReading::END_OF_MAZE:
         // Center the robot's rotation point on the middle of the junction. There,
         // we'll take the final measurement to disambiguate the junction type
-        leftMotorController.reset();
-        rightMotorController.reset();
-
         headingAngle = gyro.getAngle();
 
         leftMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
         rightMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
 
         junctionIDState = JunctionIDState::CENTERING_ON_JUNCTION;
-
-      case LineReading::LINE:
-        handleFatalError("You shouldn't be identifying a line junction");
         break;
 
       default:
+        LineSensor::printLineReading(latestLineReading);
         handleFatalError("Found an impossible line reading!!!");
         break;
     }
@@ -243,9 +259,6 @@ void identifyingJunctionActions(LineReading latestLineReading) {
 }
 
 void turningActions() {
-  static PIDController turnController(TURN_CONSTANTS, -MAX_TURN_SPEED, MAX_TURN_SPEED,
-                                      DEGREE_THRESHOLD);
-
   if (turnState == TurnState::DONE) {
     // Actions: N/A
     // State Exit Condition: Always switch to init state (the DONE state is just a marker to
@@ -266,6 +279,9 @@ void turningActions() {
 
   if (turnState == TurnState::TURNING) {
     // Actions: Update L and R motor speeds using PID computation
+    Serial.println("Target Angle: " + String(turnController.GetSetpoint()));
+    Serial.println("Current Angle: " + String(gyro.getAngle()));
+    turnController.Print();
     double motorSpinSpeed = turnController.Compute(gyro.getAngle());
     updateMotorSpeeds(-motorSpinSpeed, motorSpinSpeed);
 
@@ -279,7 +295,8 @@ void turningActions() {
 }
 
 void finishedActions() {
-  Songs::playJingleBells();
+  leftMotor.stop();
+  rightMotor.stop();
 }
 
 /**
@@ -296,6 +313,20 @@ Junction determineJunction(LineReading firstReading, LineReading lastReading) {
     case LineReading::RIGHT:
       return (lastReading == LineReading::EMPTY) ? Junction::RIGHT : Junction::RIGHT_T;
 
+    // This one's tricky--in practice, end of maze readings can occur incorrectly
+    // We don't want to stop traversal in that case, so we play an error sound and
+    // return a sensible fallback junction
+    // TODO: add reversing in the future to reapproach a junction?
+    case LineReading::END_OF_MAZE:
+      if (lastReading == LineReading::END_OF_MAZE) return Junction::END_OF_MAZE;
+
+      // Ooops, we misidentified the end of the maze!
+      // Let's play an error sound and return a dead end. In the worst case, the
+      // robot will backtrack to this particular spot.
+      Serial.println("Error: incorrectly identified an end-of-maze junction");
+      Songs::playErrorSong();
+      return Junction::DEAD_END;
+
     // This function usually is never called with the following first readings
     // because the last reading has no influence on their behavior
     case LineReading::LINE:
@@ -304,16 +335,13 @@ Junction determineJunction(LineReading firstReading, LineReading lastReading) {
     case LineReading::EMPTY:
       return Junction::DEAD_END;
 
-    case LineReading::END_OF_MAZE:
-      return Junction::END_OF_MAZE;
-
     case LineReading::UNKNOWN:
-      Songs::playSound(ERROR_SOUND, 200);
-      Serial.println("Invalid first junction reading!");
+      Songs::playErrorSong();
+      Serial.println("Invalid first junction reading: unknown junction!");
       return Junction::LINE; // Best to just treat unknown readings like a line, so the robot drives forward
 
     default:
-      handleFatalError("Invalid line reading found while determining the junction");
+      handleFatalError("Invalid line reading found while determining the junction (reached default case)");
       return Junction::DEAD_END;
   }
 }
@@ -390,16 +418,16 @@ void printStatus() {
   static int lastPrintTimeMs = millis();
   static std::vector<State> prevStates;
 
+  // Add any new states that we encounter
+  if (prevStates.empty() || prevStates.back() != state) {
+    prevStates.push_back(state);
+  }
+
   int now = millis();
 
   if (now - lastPrintTimeMs >= PRINT_DELAY_MS) {
-    Serial.print("Prev States: ");
-
-    for (State state : prevStates) {
-      Serial.print(stateAsString(state) + " -> ");
-    }
-    Serial.println();
-
+    Serial.print("Previous States: "); printStates(prevStates);
+    Serial.println("Average dt: " + String(fsmTimer.getElapsedTime() / loopCount * 1000, 2) + " ms");
     Serial.println("Last Junction: " + junctionAsString(identifiedJunction));
     Serial.print("Current Position: "); posEstimator.print();
     Serial.print("Line Sensor Vals: "); lineSensor.printAllSensorValues();
@@ -409,12 +437,25 @@ void printStatus() {
 
     prevStates.clear();
     lastPrintTimeMs = now;
-  } else {
-    // Add any new states that we encounter
-    if (prevStates.empty() || prevStates.back() != state) {
-      prevStates.push_back(state);
-    }
   }
+}
+
+/**
+ * Print the states separated by an arrow (-->), e.g.:
+ * "TURNING --> IDENTIFYING_JUNCTION --> FOLLOWING_LINE"
+ */
+void printStates(std::vector<State>& states) {
+  String stateString;
+  
+  for (State state : states) {
+    if (stateString != "") {
+      stateString += " --> ";
+    }
+
+    stateString += stateAsString(state);
+  }
+
+  Serial.println(stateString);
 }
 
 /**
@@ -424,9 +465,30 @@ void handleFatalError(String errorMessage) {
   leftMotor.stop();
   rightMotor.stop();
 
+  Serial.println("Encountered a fatal error: " + errorMessage);
+  Songs::playMarioTheme();
+
   while (true) {
-    Serial.println("Encountered a fatal error: " + errorMessage);
-    Songs::playMarioTheme();
     delay(1000);
   }
+}
+
+void turnAngle(double targetAngle) {                                    
+  turnController.Reset();
+  leftMotorController.reset();
+  rightMotorController.reset();
+  turnController.SetSetpoint(gyro.getAngle() + targetAngle);
+  
+  while (!turnController.ReachedSetpoint()) {
+    gyro.update();
+    double motorSpinSpeed = turnController.Compute(gyro.getAngle());
+    updateMotorSpeeds(-motorSpinSpeed, motorSpinSpeed);
+
+    Serial.println(String(turnController.GetSetpoint()) + "\t" + String(gyro.getAngle()));
+    
+    delay(PID_SAMPLE_PERIOD_MS);
+  }
+  
+  leftMotor.stop();
+  rightMotor.stop();
 }

@@ -7,8 +7,18 @@
 static Buzzer buzzer(BUZZER_PIN);
 
 namespace Songs {
-  void playSound(int note, unsigned int duration) {
+  void playSound(int note, unsigned int duration=200) {
     buzzer.sound(note, duration);
+  }
+
+  void playErrorSong() {
+    buzzer.begin(10);
+    
+    playSound(NOTE_AS4, 100);
+    playSound(NOTE_A4, 100);
+    playSound(NOTE_GS4, 100);
+    playSound(NOTE_G4, 100);
+    playSound(NOTE_FS4, 100);
   }
 
   void playStarWarsTheme() {

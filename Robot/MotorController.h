@@ -24,6 +24,7 @@ class MotorController {
   private:
     Motor& _motor;
     PIDController _controller;
+    Stopwatch _maxPositionTimer;
     ControlMode _mode = ControlMode::VELOCITY;
     double _maxPosition = std::numeric_limits<double>::max();
     double _targetVelocity = 0;
@@ -31,7 +32,7 @@ class MotorController {
   public:
     MotorController(Motor& motor, const PIDConstants& coeffs) :
       _motor(motor),
-      _controller(coeffs, -SPEED_THROTTLE, SPEED_THROTTLE, POSITION_THRESHOLD_INCHES)
+      _controller(coeffs, -SPEED_THROTTLE, SPEED_THROTTLE, DISTANCE_THRESHOLD_INCHES)
     {
     }
 
@@ -65,6 +66,12 @@ class MotorController {
          rampTargetPosition();
        }
 
+       // TODO: handle error where angular error causes the max position to never be reached.
+       // I'm not sure if this is possible in practice with a well-charged battery.
+       if (_controller.GetSetpoint() < _maxPosition) {
+         _maxPositionTimer.zeroOut();
+       }
+
       double motorPWMValue = _controller.Compute(_motor.getInchesDriven());
       _motor.driveAtSpeed(motorPWMValue);
     }
@@ -76,6 +83,7 @@ class MotorController {
     void reset() {
       _motor.stop();
       _controller.Reset();
+      _maxPositionTimer.zeroOut();
       _motor.resetEncoder();
       _maxPosition = std::numeric_limits<double>::max();
     }
@@ -85,7 +93,7 @@ class MotorController {
     }
 
     bool reachedMaxPosition() {
-      return reachedSetpoint() && _controller.GetSetpoint() >= _maxPosition;
+      return reachedSetpoint() && _maxPositionTimer.getElapsedTime() >= SETTLING_TIME;
     }
 
     double getTargetPosition() {
@@ -102,11 +110,16 @@ class MotorController {
      */
     void setMaxPosition(double maxPosition) {
       _maxPosition = maxPosition;
+      _maxPositionTimer.zeroOut();
     }
 
     void print() {
       Serial.print("Motor ");
       _controller.Print();
+    }
+
+    void adjustPIDConstants() {
+      _controller.AdjustPIDConstants();
     }
 
 // Helper functions

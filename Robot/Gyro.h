@@ -57,7 +57,7 @@ class Gyro {
 
       // Use a median to ignore high-value outliers.
       _gyroBias = Utils::median(gyroSamples);
-      
+
       Serial.println("Detected bias (deg / sec): " + String(_gyroBias));
 
       zeroOut();

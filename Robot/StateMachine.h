@@ -3,6 +3,7 @@
 
 // Finite State Machine
 enum class State {
+  AWAITING_INSTRUCTIONS,
   FOLLOWING_LINE,
   IDENTIFYING_JUNCTION,
   TURNING,
