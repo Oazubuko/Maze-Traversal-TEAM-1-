@@ -164,7 +164,7 @@ class LineSensor {
       int leftCount = countTapeBetween(CENTER_LEFT_PIN + 1, SENSOR_COUNT);
       int totalCount = leftCount + rightCount + centerCount;
 
-      Serial.println("Tape counts: (L=" + String(leftCount) + ", C=" + String(centerCount) + ", R=" + String(rightCount) + ")");
+//      Serial.println("Tape counts: (L=" + String(leftCount) + ", C=" + String(centerCount) + ", R=" + String(rightCount) + ")");
 
       // Determine sensor result based on the location of the tape
       if (totalCount == 0) {

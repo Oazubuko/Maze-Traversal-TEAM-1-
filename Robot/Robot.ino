@@ -2,6 +2,7 @@
 #include <PID_v1.h>
 #include <Buzzer.h>
 #include <Arduino_LSM9DS1.h>
+#include <ArduinoBLE.h> //Integrated Code
 #include "Motor.h"
 #include "Constants.h"
 #include "LineSensor.h"
@@ -31,6 +32,8 @@ PositionEstimator posEstimator(leftMotor, rightMotor, gyro);
 Stopwatch fsmTimer;
 
 // Forward Declarations
+void bluetooth_init(); //Integrated Code
+void update_directions(String directions); //Integrated Code
 void playToneFor(Junction junction, unsigned int duration = 50);
 int getToneFor(Junction junction);
 int pickTurnDirection();
@@ -45,9 +48,31 @@ void updateLineSensorHistory();
 int pickTurnAngle();
 void driveForward(double distanceInches);
 
+// create switch characteristic and allow remote device to read and write
+BLEService mazeService("0fe79935-cd39-480a-8a44-06b70f36f248"); //Integrated Code
+BLEUnsignedCharCharacteristic flagCharacteristic("1fe79935-cd39-480a-8a44-06b70f36f24a", BLERead | BLEWrite | BLENotify); //Integrated Code
+BLEStringCharacteristic directionsCharacteristic("1fe79935-cd39-480a-8a44-06b70f36f24c", BLERead | BLEWrite, 100); //Integrated Code
+String directions; //Integrated Code
+bool   hasConnected;  //Integrated Code
+bool   hasFirstMessage; // Integrated Code
+bool   hasFinished; // Integrated Code
+bool   asked4directions;  // Integrated Code
+
 void setup() {
+  state = State::AWAITING_INSTRUCTIONS; //ensure desired intital state
   Serial.begin(9600);
+
   Songs::playStarWarsTheme();
+
+  bluetooth_init(); //Integrated Code
+  //Request Directions form Jetson
+  //flagCharacteristic.setValue(-1); //Integrated Code
+
+  directions       = "None"; //Integrated Code
+  hasConnected     = false; //Integrated Code
+  hasFirstMessage  = false; //Integrated Code
+  hasFinished      = false; //Integrated Code
+  asked4directions = false; //Integrated Code
 
   gyro.begin();
   lineSensor.begin();
@@ -67,13 +92,30 @@ void setup() {
 void loop() {
   // Read sensors
   LineReading lineReading = lineSensor.getReading();
-//  LineSensor::printLineReading(lineReading);
-//  lineSensor.printAllSensorValues();
   gyro.update();
   posEstimator.update();
 
   // Finite State Machine
   switch (state) {
+    case State::AWAITING_INSTRUCTIONS:
+      awaitingInstructionsActions();
+
+      if (hasConnected && hasFirstMessage)
+      {
+        // TODO: remove
+        Songs::playSound(NOTE_C4);
+
+        if (directions == "None")
+        {
+          enterFollowingLineState();
+        }
+        else//directions available
+        {
+          state = State::OPTIMIZED_MAZE_RUN; // TODO: add entrance function
+        }
+      }
+      break;
+
     case State::FOLLOWING_LINE:
       followingLineActions();
 
@@ -109,6 +151,14 @@ void loop() {
       finishedActions();
       break;
 
+    case State::OPTIMIZED_MAZE_RUN:
+      // TODO: add actions and transitions
+      break;
+
+    case State::TRANSMITTING_DIRECTIONS:
+      // TODO: add actions and transitions
+      break;
+
     default:
       handleFatalError("Illegal state in next state logic check");
       break;
@@ -121,8 +171,25 @@ void loop() {
 }
 
 /**
- * Line Following State
- */
+   Awaiting Instructions State
+*/
+void awaitingInstructionsActions()
+{
+  //polls and handles any events on the queue
+  BLE.poll();
+
+  if (hasConnected && !asked4directions)
+  {
+    flagCharacteristic.setValue(2);
+    asked4directions = true;
+    Serial.println("Inside awaiting instructions");
+  }//End of else if (hasConnected && !asked4directions)
+
+}//End of void awaitingInstructionsActions()
+
+/**
+   Line Following State
+*/
 void enterFollowingLineState() {
   state = State::FOLLOWING_LINE;
 
@@ -142,8 +209,8 @@ void followingLineActions() {
 }
 
 /**
- * Identify Junction State
- */
+   Identify Junction State
+*/
 void enterIdentifyingJunctionState(LineReading latestLineReading) {
   state = State::IDENTIFYING_JUNCTION;
 
@@ -216,8 +283,8 @@ void identifyingJunctionActions(LineReading latestLineReading) {
 }
 
 /**
- * Turning State
- */
+   Turning State
+*/
 void enterTurningState() {
   state = State::TURNING;
 
@@ -240,8 +307,8 @@ void turningActions() {
 }
 
 /**
- * Finished State
- */
+   Finished State
+*/
 void enterFinishedState() {
   state = State::FINISHED;
 
@@ -253,8 +320,8 @@ void finishedActions() {
 }
 
 /**
- * Helper Functions
- */
+   Helper Functions
+*/
 
 /**
    Determine which junction the robot encountered based on two line sensor readings.
@@ -490,4 +557,79 @@ void driveForward(double inches) {
 
   leftMotor.stop();
   rightMotor.stop();
+}
+
+
+//Integrated Code
+void flagCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic)
+{
+  unsigned char flag = flagCharacteristic.value();
+  Serial.print("flagCharacteristicWritten ");
+  Serial.println(flag);
+
+  if (flag == 4)
+  {
+    directions = directionsCharacteristic.value();
+    hasFirstMessage = true;
+    Serial.print("directionsCharacteristicWritten: ");
+    Serial.println(directions);
+  }
+}
+
+//Integrated Code
+void update_directions(String directions)
+{
+  directionsCharacteristic.writeValue(directions);
+  flagCharacteristic.setValue(1);
+}
+
+//Integrated Code
+void bluetooth_init()
+{
+  if (!BLE.begin())
+  {
+    Serial.println("starting BLE failed!");
+    while (1);
+  }
+
+  // Set the connection interval to be as fast as possible (about 40 Hz)
+  BLE.setConnectionInterval(0x0006, 0x0050);
+
+  BLE.setLocalName("Zach's Mouse :)");
+  BLE.setAdvertisedService(mazeService);
+  mazeService.addCharacteristic(flagCharacteristic);
+  mazeService.addCharacteristic(directionsCharacteristic);
+  BLE.addService(mazeService);
+
+  BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+  BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
+
+  // assign event handlers for characteristic
+  flagCharacteristic.setEventHandler(BLEWritten, flagCharacteristicWritten);
+  flagCharacteristic.setValue(-1);
+  String directions = "None";
+  directionsCharacteristic.writeValue(directions);
+  BLE.advertise();
+  Serial.println("Waiting for connection");
+}
+
+//Integrated Code
+//Needed for Clean Exit
+void blePeripheralConnectHandler(BLEDevice central)
+{
+  hasConnected = true;
+  Serial.print("Connected event, central: ");
+  Serial.println(central.address());
+}
+
+//Integrated Code
+//Needed for Clean Exit
+void blePeripheralDisconnectHandler(BLEDevice central)
+{
+  //BLE.disconnect();
+  hasConnected     = false;
+  hasFirstMessage  = false;
+  asked4directions = false;
+  Serial.print("Disconnected event, central: ");
+  Serial.println(central.address());
 }
