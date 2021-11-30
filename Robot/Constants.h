@@ -12,6 +12,9 @@
 constexpr uint16_t PRINT_DELAY_MS = 500;
 constexpr float ENCODER_TICKS_PER_INCH = 84.91667; // TODO: improve
 
+// Misc. Constants
+constexpr uint16_t PRINT_DELAY_MS = 500;
+
 // Pins
 constexpr uint8_t BUZZER_PIN = 10;
 
