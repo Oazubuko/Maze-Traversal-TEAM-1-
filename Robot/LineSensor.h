@@ -9,16 +9,19 @@
 #include <Adafruit_MCP3008.h>
 #include <cstdint>
 #include "Junction.h"
+#include "Songs.h"
 
 /**
    The tape orientations that the line sensor can detect
 */
 enum class LineReading {
-  EMPTY,    // No tape seen
-  CENTERED, // Tape only seen on the middle sensors
-  LEFT,     // Tape only seen on the left side
-  RIGHT,    // Tape only seen on the right side
-  FULL      // Tape seen on both sides
+  EMPTY,        // No tape seen
+  LINE,         // Tape seen on only a few sensors (<= 3)
+  FULL,         // Tape seen on almost every sensor (>= 10)
+  END_OF_MAZE,  // Tape seen on all but the outermost sensors
+  LEFT,         // Tape only seen on the left side
+  RIGHT,        // Tape only seen on the right side
+  UNKNOWN       // Any other configuration
 };
 
 class LineSensor {
@@ -55,7 +58,13 @@ class LineSensor {
       _leftADC.begin(_leftADCPin);
       _rightADC.begin(_rightADCPin);
 
+      // Only run calibration if the tape cutoff reflectance is undefined
+#ifndef TAPE_CUTOFF_REFLECTANCE
       calibrate();
+#else
+      MAX_TAPE_REFLECTANCE = TAPE_CUTOFF_REFLECTANCE;
+      Serial.println("Skipping line sensor calibration, using a tape cutoff of " + String(MAX_TAPE_REFLECTANCE));
+#endif
     }
 
     /**
@@ -93,33 +102,6 @@ class LineSensor {
       return getReflectanceAt(sensorIndex) < MAX_TAPE_REFLECTANCE;
     }
 
-    bool centeredOnTape() {
-      return isSensorAboveTape(CENTER_PIN);
-    }
-
-    /**
-       Returns the number of sensors with tape between the start and end index (inclusive)
-    */
-    int countTapeBetween(int startIndex, int endIndex) {
-      int tapeCount = 0;
-
-      for (int i = startIndex; i <= endIndex; i++) {
-        if (isSensorAboveTape(i)) {
-          tapeCount++;
-        }
-      }
-
-      return tapeCount;
-    }
-
-    int countRightTape() {
-      return countTapeBetween(1, CENTER_PIN - 1);
-    }
-
-    int countLeftTape() {
-      return countTapeBetween(CENTER_PIN + 1, SENSOR_COUNT);
-    }
-
     /**
        Return a skew value that summarizes how much the line sensor is misaligned with the
        tape below. Skew ranges from [-1, +1]. Positive values indicate that the sensor is
@@ -152,48 +134,94 @@ class LineSensor {
       return skew / MAX_SKEW_PER_SIDE;
     }
 
-    bool cantSeeAnyTape() {
-      for (int i = 1; i <= SENSOR_COUNT; i++) {
-        if (isSensorAboveTape(i)) return false;
-      }
-
-      return true;
-    }
-
     void printAllSensorValues() {
+      Serial.println("Reflectances w/ cutoff (" + String(MAX_TAPE_REFLECTANCE) + "): ");
+      String pinLabels;
+      String message;
+      
       for (int i = SENSOR_COUNT; i >= 1; i--) {
-        Serial.print(getReflectanceAt(i));
-        Serial.print("\t");
+        message += getReflectanceAt(i);
+        message += '\t';
+        
+        pinLabels += i;
+        pinLabels += '\t';
       }
-      Serial.println();
+            
+      Serial.println(pinLabels);
+      Serial.println(message);
     }
 
-    // Looks at the tape
+    /**
+       Summarizes a reading from the line sensor
+    */
     LineReading getReading() {
-      if (cantSeeAnyTape()) {
+      // Here, we don't use the countLeftTape() and countRightTape() functions
+      // because we don't want to include the middle left/right sensors when
+      // checking for left/right turns. The middle sensors are regularly during
+      // regular line following, which isn't what we want.
+      int rightCount = countTapeBetween(1, CENTER_RIGHT_PIN - 1);
+      int centerCount = countTapeBetween(CENTER_RIGHT_PIN, CENTER_LEFT_PIN);
+      int leftCount = countTapeBetween(CENTER_LEFT_PIN + 1, SENSOR_COUNT);
+      int totalCount = leftCount + rightCount + centerCount;
+
+      Serial.println("Tape counts: (L=" + String(leftCount) + ", C=" + String(centerCount) + ", R=" + String(rightCount) + ")");
+
+      // Determine sensor result based on the location of the tape
+      if (totalCount == 0) {
         return LineReading::EMPTY;
       }
-
-      bool foundLeftTape = countLeftTape() > TAPE_COUNT_THRESHOLD;
-      bool foundRightTape = countRightTape() > TAPE_COUNT_THRESHOLD;
-
-      if (foundRightTape && foundLeftTape) {
+      if (centerCount == 3 && (2 <= leftCount && leftCount <= 3) && (2 <= rightCount && rightCount <= 3) ) {
+        return LineReading::END_OF_MAZE;
+      }
+      if (leftCount >= TAPE_COUNT_THRESHOLD && rightCount >= TAPE_COUNT_THRESHOLD) {
         return LineReading::FULL;
-      } else if (foundRightTape) {
-        return LineReading::RIGHT;
-      } else if (foundLeftTape) {
+      }
+      if (leftCount >= TAPE_COUNT_THRESHOLD) {
         return LineReading::LEFT;
       }
+      if (rightCount >= TAPE_COUNT_THRESHOLD) {
+        return LineReading::RIGHT;
+      }
 
-      return LineReading::CENTERED;
+      return LineReading::LINE;
+
+      // TODO: add in UNKNOWN line readings?
     }
 
+    static void printLineReading(LineReading lineReading) {
+      switch (lineReading)
+      {
+        case LineReading::EMPTY:
+          Serial.println("Empty");
+          break;
+        case LineReading::LINE:
+          Serial.println("Line");
+          break;
+        case LineReading::END_OF_MAZE:
+          Serial.println("End of Maze");
+          break;
+        case LineReading::FULL:
+          Serial.println("Full");
+          break;
+        case LineReading::LEFT:
+          Serial.println("Left");
+          break;
+        case LineReading::RIGHT:
+          Serial.println("Right");
+          break;
+        case LineReading::UNKNOWN:
+        default:
+          Serial.println("Unknown");
+      }
+    }
+
+    
     /**
        Determine the value below which a sensor reading will be considered white tape.
 
        This is needed to handle different levels of ambient light.
 
-       For proper calibration, place the center reflectance sensor above tape while this 
+       For proper calibration, place the center reflectance sensor above tape while this
        function is being called (see the diagram below):
                         |_______
                         |       |
@@ -201,41 +229,88 @@ class LineSensor {
                         |_______|
                         |
     */
-    void calibrate() {      
+    void calibrate() {
       Serial.println("Calculating tape cutoff threshold...");
 
-      constexpr int NUM_SAMPLES = 100;
+      constexpr int NUM_SAMPLES = 20;
 
-      float nonTapeReflectance = 0;
-      float tapeReflectance = 0;
+      float blackReflectance = 0;
+      float minBlackReflectance = 0;
+      float whiteReflectance = 0;
 
       for (int i = 1; i <= NUM_SAMPLES; i++) {
         // Center pin is above white tape
-        tapeReflectance += getReflectanceAt(CENTER_PIN);
+        whiteReflectance += getReflectanceAt(CENTER_PIN);
 
-        // Non-Center Pins arent above white tape
+        // Non-Center Pins arent above white tape. Because we never want to consider non-tape values
+        // as tape, we take the minimum reflectance on the left and right sides.
         float rightReflectance = averageReflectanceBetween(1, CENTER_PIN - 2);
         float leftReflectance = averageReflectanceBetween(CENTER_PIN + 2, SENSOR_COUNT);
-        nonTapeReflectance += (leftReflectance + rightReflectance) / 2;
+        blackReflectance += (leftReflectance + rightReflectance) / 2;
 
-        Serial.println("Average Tape: " + String(tapeReflectance / i));
-        Serial.println("Average Not Tape: " + String(nonTapeReflectance / i));
+        // Also calculate minimum reflectance of non-tape values
+        int rightMin = minReflectanceBetween(1, CENTER_PIN - 2);
+        int leftMin = minReflectanceBetween(CENTER_PIN + 2, SENSOR_COUNT);
+        minBlackReflectance += min(leftMin, rightMin);
+
+        Serial.println("Average Tape: " + String(whiteReflectance / i));
+        Serial.println("Average Not Tape: " + String(blackReflectance / i));
+        Serial.println("Min Not Tape: " + String(minBlackReflectance / i));
+        printAllSensorValues();
 
         delay(10);
       }
 
-      // Set the threshold a little below the midpoint of the average reflectance values
-      float totalReflectance = (tapeReflectance + nonTapeReflectance) / NUM_SAMPLES;
-      MAX_TAPE_REFLECTANCE = static_cast<int>(totalReflectance * 0.40);
+      // Average all samples
+      whiteReflectance /= NUM_SAMPLES;
+      blackReflectance /= NUM_SAMPLES;
+      minBlackReflectance /= NUM_SAMPLES;
+
+      if (minBlackReflectance <= whiteReflectance) {
+        Serial.println("Error: Non Tape Reflectance is lower than than the tape reflectance!");
+        Songs::playErrorSong();
+      }
+
+      // Set the cutoff at the midpoint between the white and black reflectances.
+      // In the worst case, the midpoint is above the below the white reflectance or above
+      // the minimum black value, so there's a fallback in those cases
+      float idealCutoff = (blackReflectance + whiteReflectance) / 2;
+      float realisticCutoff = min(idealCutoff, minBlackReflectance - 5);
+      float minPossibleCutoff = whiteReflectance + 5;
+      MAX_TAPE_REFLECTANCE = static_cast<int>(max(realisticCutoff, minPossibleCutoff));
 
       Serial.println("Finished calculating tape cutoff: " + String(MAX_TAPE_REFLECTANCE));
+    }
+
+  private:
+    /**
+       Returns the number of sensors with tape between the start and end index (inclusive)
+    */
+    int countTapeBetween(int startIndex, int endIndex) {
+      int tapeCount = 0;
+
+      for (int i = startIndex; i <= endIndex; i++) {
+        if (isSensorAboveTape(i)) {
+          tapeCount++;
+        }
+      }
+
+      return tapeCount;
+    }
+
+    int countRightTape() {
+      return countTapeBetween(1, CENTER_RIGHT_PIN);
+    }
+
+    int countLeftTape() {
+      return countTapeBetween(CENTER_LEFT_PIN, SENSOR_COUNT);
     }
 
     /**
        The average reflectance value between the start and end pin inclusive
     */
-    float averageReflectanceBetween(int startPin, int endPin) {
-      float totalReflectance = 0;
+    int averageReflectanceBetween(int startPin, int endPin) {
+      int totalReflectance = 0;
       int numSamples = endPin - startPin + 1;
 
       for (int pin = startPin; pin <= endPin; pin++) {
@@ -243,5 +318,18 @@ class LineSensor {
       }
 
       return totalReflectance / numSamples;
+    }
+
+    /**
+       The minimum reflectance value between the start and end pin inclusive
+    */
+    int minReflectanceBetween(int startPin, int endPin) {
+      int minReflectance = 2048; // Larger than 1024 max
+
+      for (int pin = startPin; pin <= endPin; pin++) {
+        minReflectance = min(minReflectance, getReflectanceAt(pin));
+      }
+
+      return minReflectance;
     }
 };

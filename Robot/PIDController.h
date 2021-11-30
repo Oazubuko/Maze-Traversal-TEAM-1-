@@ -35,7 +35,7 @@ class PIDController : public PID
     }
 
     void IncrementSetpoint(double increment) {
-      _setpoint += increment;
+      SetSetpoint(_setpoint + increment);
     }
 
     double GetSetpoint() {
@@ -76,6 +76,10 @@ class PIDController : public PID
       return _timeAtSetpoint >= SETTLING_TIME || _setpointTimer.getElapsedTime() >= PID_TIMEOUT;
     }
 
+    float GetTimeAtSetpoint() {
+      return _timeAtSetpoint;
+    }
+
     /**
        Resets the state of the PID controller (prevents build-up of the integral
        term between separate setpoints)
@@ -101,7 +105,7 @@ class PIDController : public PID
        Opens a dialog in the Serial monitor to adjust the PID constants of this controller.
        The new constants should be entered in the form "kp, ki, kd"
     */
-    void AdjustPIDContants() {
+    void AdjustPIDConstants() {
       Serial.println("Enter your PID constants in the form 'kp,ki,kd': ");
 
       if (!Utils::awaitUserInput()) {

@@ -57,7 +57,7 @@ class Gyro {
 
       // Use a median to ignore high-value outliers.
       _gyroBias = Utils::median(gyroSamples);
-      
+
       Serial.println("Detected bias (deg / sec): " + String(_gyroBias));
 
       zeroOut();
@@ -67,10 +67,24 @@ class Gyro {
       return _currentAngle;
     }
 
-    void zeroOut() {
-      _currentAngle = 0;
+    float setAngle(float angle) {
+      _currentAngle = angle;
       _integrationTimer.zeroOut();
     }
+
+    void zeroOut() {
+      setAngle(0);
+    }
+
+    /**
+       Snaps the current angle to the closest multiple of 90 degrees. Limits
+       the angle to the range [0, 360)
+    */
+    void alignWithCardinalDirection() {
+      int closestMultiple = round(_currentAngle / 90);
+      setAngle(90 * (closestMultiple % 4));
+    }
+
 
     /**
      * Computes and returns the angle in degrees using Euler's Method
