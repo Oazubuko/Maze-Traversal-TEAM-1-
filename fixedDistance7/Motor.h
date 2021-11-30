@@ -10,8 +10,6 @@
 #include <Encoder.h>
 #include "Constants.h"
 
-// TODO: create motor pin struct
-
 class Motor 
 {
   private:

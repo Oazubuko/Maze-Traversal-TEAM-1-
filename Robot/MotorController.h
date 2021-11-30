@@ -15,11 +15,11 @@ enum class ControlMode {
 };
 
 /**
- * A motor controller with positional and velocity control modes.
- * 
- * Velocity control is achieved by ramping the positional setpoint
- * in small increments.
- */
+   A motor controller with positional and velocity control modes.
+
+   Velocity control is achieved by ramping the positional setpoint
+   in small increments.
+*/
 class MotorController {
   private:
     Motor& _motor;
@@ -28,7 +28,7 @@ class MotorController {
     ControlMode _mode = ControlMode::VELOCITY;
     double _maxPosition = std::numeric_limits<double>::max();
     double _targetVelocity = 0;
-    
+
   public:
     MotorController(Motor& motor, const PIDConstants& coeffs) :
       _motor(motor),
@@ -37,49 +37,49 @@ class MotorController {
     }
 
     /**
-     * Sets the target position
-     */
+       Sets the target position
+    */
     void setTargetPosition(double targetPositionInInches) {
       _controller.SetSetpoint(targetPositionInInches);
     }
 
     /**
-     * Sets the target position (only works in VELOCITY control mode)
-     */
+       Sets the target position (only works in VELOCITY control mode)
+    */
     void setTargetVelocity(double targetVelocity) {
-       _targetVelocity = targetVelocity;
+      _targetVelocity = targetVelocity;
     }
 
-   /**
-    * Adjust the control modes, which determines whether to ramp the setpoint based
-    * on a target velocity or to set a static positional setpoint
+    /**
+       Adjust the control modes, which determines whether to ramp the setpoint based
+       on a target velocity or to set a static positional setpoint
     */
     void setControlMode(ControlMode newMode) {
       _mode = newMode;
     }
 
     /**
-     * Adjusts the motor's speed based on calculations of the internal PID controller
-     */
+       Adjusts the motor's speed based on calculations of the internal PID controller
+    */
     void update() {
-       if (_mode == ControlMode::VELOCITY) {
-         rampTargetPosition();
-       }
+      if (_mode == ControlMode::VELOCITY) {
+        rampTargetPosition();
+      }
 
-       // TODO: handle error where angular error causes the max position to never be reached.
-       // I'm not sure if this is possible in practice with a well-charged battery.
-       if (_controller.GetSetpoint() < _maxPosition) {
-         _maxPositionTimer.zeroOut();
-       }
+      // TODO: handle error where angular error causes the max position to never be reached.
+      // I'm not sure if this is possible in practice with a well-charged battery.
+      if (_controller.GetSetpoint() < _maxPosition) {
+        _maxPositionTimer.zeroOut();
+      }
 
       double motorPWMValue = _controller.Compute(_motor.getInchesDriven());
       _motor.driveAtSpeed(motorPWMValue);
     }
 
     /**
-     * Reset the state of the controller (i.e., the setpoint and outputs). Does not modify the 
-     * control mode.
-     */
+       Reset the state of the controller (i.e., the setpoint and outputs). Does not modify the
+       control mode.
+    */
     void reset() {
       _motor.stop();
       _controller.Reset();
@@ -101,13 +101,13 @@ class MotorController {
     }
 
     double getTargetVelocity() {
-       return _targetVelocity;
+      return _targetVelocity;
     }
 
     /**
-     * Set the maximum position setpoint. This parameter can be used to achieve a target
-     * positional setpoint in velocity control mode
-     */
+       Set the maximum position setpoint. This parameter can be used to achieve a target
+       positional setpoint in velocity control mode
+    */
     void setMaxPosition(double maxPosition) {
       _maxPosition = maxPosition;
       _maxPositionTimer.zeroOut();
@@ -122,16 +122,16 @@ class MotorController {
       _controller.AdjustPIDConstants();
     }
 
-// Helper functions
-private:
-   /**
-    * Ramp up the positional setpoint up based on the current target velocity and the
-    * time since the last PID computation
+    // Helper functions
+  private:
+    /**
+       Ramp up the positional setpoint up based on the current target velocity and the
+       time since the last PID computation
     */
     void rampTargetPosition() {
-       double positionIncrement = _targetVelocity * _controller.GetTimeDelta();
-       double nextPositionSetpoint = _controller.GetSetpoint() + positionIncrement;
+      double positionIncrement = _targetVelocity * _controller.GetTimeDelta();
+      double nextPositionSetpoint = _controller.GetSetpoint() + positionIncrement;
 
-       _controller.SetSetpoint(min(nextPositionSetpoint, _maxPosition));
+      _controller.SetSetpoint(min(nextPositionSetpoint, _maxPosition));
     }
 };

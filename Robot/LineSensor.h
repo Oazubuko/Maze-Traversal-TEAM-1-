@@ -58,7 +58,13 @@ class LineSensor {
       _leftADC.begin(_leftADCPin);
       _rightADC.begin(_rightADCPin);
 
+      // Only run calibration if the tape cutoff reflectance is undefined
+#ifndef TAPE_CUTOFF_REFLECTANCE
       calibrate();
+#else
+      MAX_TAPE_REFLECTANCE = TAPE_CUTOFF_REFLECTANCE;
+      Serial.println("Skipping line sensor calibration, using a tape cutoff of " + String(MAX_TAPE_REFLECTANCE));
+#endif
     }
 
     /**
@@ -129,11 +135,20 @@ class LineSensor {
     }
 
     void printAllSensorValues() {
+      Serial.println("Reflectances w/ cutoff (" + String(MAX_TAPE_REFLECTANCE) + "): ");
+      String pinLabels;
+      String message;
+      
       for (int i = SENSOR_COUNT; i >= 1; i--) {
-        Serial.print(getReflectanceAt(i));
-        Serial.print("\t");
+        message += getReflectanceAt(i);
+        message += '\t';
+        
+        pinLabels += i;
+        pinLabels += '\t';
       }
-      Serial.println();
+            
+      Serial.println(pinLabels);
+      Serial.println(message);
     }
 
     /**
@@ -149,7 +164,7 @@ class LineSensor {
       int leftCount = countTapeBetween(CENTER_LEFT_PIN + 1, SENSOR_COUNT);
       int totalCount = leftCount + rightCount + centerCount;
 
-      Serial.println("Tape counts: (L=" + String(leftCount) + ", R=" + String(rightCount) + ", T=" + String(totalCount) + ")");
+      Serial.println("Tape counts: (L=" + String(leftCount) + ", C=" + String(centerCount) + ", R=" + String(rightCount) + ")");
 
       // Determine sensor result based on the location of the tape
       if (totalCount == 0) {
@@ -200,30 +215,7 @@ class LineSensor {
       }
     }
 
-  private:
-    /**
-       Returns the number of sensors with tape between the start and end index (inclusive)
-    */
-    int countTapeBetween(int startIndex, int endIndex) {
-      int tapeCount = 0;
-
-      for (int i = startIndex; i <= endIndex; i++) {
-        if (isSensorAboveTape(i)) {
-          tapeCount++;
-        }
-      }
-
-      return tapeCount;
-    }
-
-    int countRightTape() {
-      return countTapeBetween(1, CENTER_RIGHT_PIN);
-    }
-
-    int countLeftTape() {
-      return countTapeBetween(CENTER_LEFT_PIN, SENSOR_COUNT);
-    }
-
+    
     /**
        Determine the value below which a sensor reading will be considered white tape.
 
@@ -288,6 +280,30 @@ class LineSensor {
       MAX_TAPE_REFLECTANCE = static_cast<int>(max(realisticCutoff, minPossibleCutoff));
 
       Serial.println("Finished calculating tape cutoff: " + String(MAX_TAPE_REFLECTANCE));
+    }
+
+  private:
+    /**
+       Returns the number of sensors with tape between the start and end index (inclusive)
+    */
+    int countTapeBetween(int startIndex, int endIndex) {
+      int tapeCount = 0;
+
+      for (int i = startIndex; i <= endIndex; i++) {
+        if (isSensorAboveTape(i)) {
+          tapeCount++;
+        }
+      }
+
+      return tapeCount;
+    }
+
+    int countRightTape() {
+      return countTapeBetween(1, CENTER_RIGHT_PIN);
+    }
+
+    int countLeftTape() {
+      return countTapeBetween(CENTER_LEFT_PIN, SENSOR_COUNT);
     }
 
     /**

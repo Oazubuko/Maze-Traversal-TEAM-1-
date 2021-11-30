@@ -26,8 +26,8 @@ void identifyingJunctionActions(LineReading);
 void turningActions();
 void finishedActions();
 
-// State transitions
-State followingLineNextState(LineReading);
-State identifyingJunctionNextState();
-State turningNextState();
-State finishedNextState();
+// State entry functions
+void enterFollowingLineState();
+void enterIdentifyingJunctionState(LineReading);
+void enterTurningState();
+void enterFinishedState();

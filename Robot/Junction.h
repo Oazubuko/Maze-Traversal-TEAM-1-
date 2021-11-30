@@ -11,7 +11,8 @@ enum class Junction {
   PLUS,
   LINE,
   DEAD_END,
-  END_OF_MAZE
+  END_OF_MAZE,
+  UNKNOWN
 };
 
 String junctionAsString(Junction junction) {
@@ -26,6 +27,9 @@ String junctionAsString(Junction junction) {
     case Junction::PLUS: return "Plus (+)";
     case Junction::LINE: return "Line (|)";
     case Junction::END_OF_MAZE: return "End of Maze (⦀)";
-    default: return "Unknown junction!!";
+    
+    case Junction::UNKNOWN:
+    default:
+      return "Unknown junction!!";
   }
 }
