@@ -14,7 +14,7 @@
 #include "StateMachine.h"
 
 // Global state / data
-State state = State::FOLLOWING_LINE;
+State state = State::AWAITING_INSTRUCTIONS;
 int loopCount = 0;
 Junction identifiedJunction = Junction::LINE;
 LineReading firstLineReading = LineReading::LINE;
@@ -49,17 +49,16 @@ int pickTurnAngle();
 void driveForward(double distanceInches);
 
 // create switch characteristic and allow remote device to read and write
-BLEService mazeService("0fe79935-cd39-480a-8a44-06b70f36f248"); //Integrated Code
-BLEUnsignedCharCharacteristic flagCharacteristic("1fe79935-cd39-480a-8a44-06b70f36f24a", BLERead | BLEWrite | BLENotify); //Integrated Code
-BLEStringCharacteristic directionsCharacteristic("1fe79935-cd39-480a-8a44-06b70f36f24c", BLERead | BLEWrite, 100); //Integrated Code
-String directions; //Integrated Code
-bool   hasConnected;  //Integrated Code
-bool   hasFirstMessage; // Integrated Code
-bool   hasFinished; // Integrated Code
-bool   asked4directions;  // Integrated Code
+BLEService mazeService(MAZE_SERVICE_ID); //Integrated Code
+BLEUnsignedCharCharacteristic flagCharacteristic(FLAG_CHARACTERISTIC_ID, BLERead | BLEWrite | BLENotify); //Integrated Code
+BLEStringCharacteristic directionsCharacteristic(DIRECTIONS_CHARACTERISTIC_ID, BLERead | BLEWrite, 100); //Integrated Code
+String directions       = NO_DIRECTIONS;  //Integrated Code
+bool   hasConnected     = false;          //Integrated Code
+bool   hasFirstMessage  = false;          // Integrated Code
+bool   hasFinished      = false;          // Integrated Code
+bool   asked4directions = false;          // Integrated Code
 
 void setup() {
-  state = State::AWAITING_INSTRUCTIONS; //ensure desired intital state
   Serial.begin(9600);
 
   Songs::playStarWarsTheme();
@@ -67,12 +66,6 @@ void setup() {
   bluetooth_init(); //Integrated Code
   //Request Directions form Jetson
   //flagCharacteristic.setValue(-1); //Integrated Code
-
-  directions       = "None"; //Integrated Code
-  hasConnected     = false; //Integrated Code
-  hasFirstMessage  = false; //Integrated Code
-  hasFinished      = false; //Integrated Code
-  asked4directions = false; //Integrated Code
 
   gyro.begin();
   lineSensor.begin();
@@ -105,12 +98,10 @@ void loop() {
         // TODO: remove
         Songs::playSound(NOTE_C4);
 
-        if (directions == "None")
-        {
+        if (directions == NO_DIRECTIONS) {
           enterFollowingLineState();
-        }
-        else//directions available
-        {
+        } else {
+          //directions available
           state = State::OPTIMIZED_MAZE_RUN; // TODO: add entrance function
         }
       }
@@ -156,7 +147,13 @@ void loop() {
       break;
 
     case State::TRANSMITTING_DIRECTIONS:
-      // TODO: add actions and transitions
+      transmittingDirectionsActions();
+      
+      //after confirmed directions transmitted successfully, enterFinishedState();
+      if(flagCharacteristic.value() == 5)//its either 5 or 6, if this does not work try 6
+      {
+        enterFinishedState();
+      }
       break;
 
     default:
@@ -178,13 +175,11 @@ void awaitingInstructionsActions()
   //polls and handles any events on the queue
   BLE.poll();
 
-  if (hasConnected && !asked4directions)
-  {
+  if (hasConnected && !asked4directions) {
     flagCharacteristic.setValue(2);
     asked4directions = true;
-    Serial.println("Inside awaiting instructions");
-  }//End of else if (hasConnected && !asked4directions)
-
+    Serial.println("Inside awaiting instructions"); // TODO: removed
+  }
 }//End of void awaitingInstructionsActions()
 
 /**
@@ -307,6 +302,25 @@ void turningActions() {
 }
 
 /**
+ * Transmitting Directions State
+ */
+void enterTransmittingDirectionsState() 
+{
+  state = State::TRANSMITTING_DIRECTIONS;
+
+  leftMotor.stop();
+  rightMotor.stop();
+  update_directions(directions);
+  hasFinished = true;
+}
+
+void transmittingDirectionsActions() 
+{
+   //BLE.poll() needed to trigger transfer of data to Jetson
+   BLE.poll();
+}
+
+/**
    Finished State
 */
 void enterFinishedState() {
@@ -379,19 +393,23 @@ int pickTurnAngle() {
   switch (identifiedJunction)
   {
     case Junction::LEFT:
+      directions += "L";
       return 90;
 
     case Junction::PLUS:
     case Junction::RIGHT:
     case Junction::RIGHT_T:
     case Junction::T:
+      directions += "R";
       return -90;
 
     case Junction::LEFT_T:
+      directions += "S";
     case Junction::LINE:
       return 0;
 
     case Junction::DEAD_END:
+      directions += "B";
       return 180;
 
     default:
@@ -595,7 +613,7 @@ void bluetooth_init()
   // Set the connection interval to be as fast as possible (about 40 Hz)
   BLE.setConnectionInterval(0x0006, 0x0050);
 
-  BLE.setLocalName("Zach's Mouse :)");
+  BLE.setLocalName(MOUSE_NAME);
   BLE.setAdvertisedService(mazeService);
   mazeService.addCharacteristic(flagCharacteristic);
   mazeService.addCharacteristic(directionsCharacteristic);
@@ -607,8 +625,7 @@ void bluetooth_init()
   // assign event handlers for characteristic
   flagCharacteristic.setEventHandler(BLEWritten, flagCharacteristicWritten);
   flagCharacteristic.setValue(-1);
-  String directions = "None";
-  directionsCharacteristic.writeValue(directions);
+  directionsCharacteristic.writeValue(NO_DIRECTIONS);
   BLE.advertise();
   Serial.println("Waiting for connection");
 }

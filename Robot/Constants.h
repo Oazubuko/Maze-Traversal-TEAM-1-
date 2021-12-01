@@ -4,18 +4,62 @@
 #include <Arduino.h>
 #include <Buzzer.h>
 
-// Preprocessor modes
+/**
+ * Preprocessor modes
+ */
 //#define NO_BATTERY                  // Comment this line if the battery is inserted into the robot
 #define TAPE_CUTOFF_REFLECTANCE 690   // Comment this line to enable automatic tape cutoff detection for the line sensor
 
-// Misc. Constants
+/**
+ * Mouse Owner variables (used for mouse-specific configuration)
+ */
+#define ZACHS_MOUSE             // Comment this line if you're not Zach
+//#define MACHIS_MOUSE          // Comment this line if you're not Machi
+//#define EDS_MOUSE             // Comment this line if you're not Ed
+
+/**
+ * Bluetooth
+ */
+const char MAZE_SERVICE_ID[] = "0fe79935-cd39-480a-8a44-06b70f36f248";
+const char NO_DIRECTIONS[] = "None";
+enum FlagCharacteristicVals { // TODO figure out what A, B, and C are!
+  A = -1,
+  B = 1,
+  C = 2,
+  D = 4
+};
+
+#if defined(EDS_MOUSE)
+const char FLAG_CHARACTERISTIC_ID[] = "0fe79935-cd39-480a-8a44-06b70f36f24a";
+const char DIRECTIONS_CHARACTERISTIC_ID[] = "0fe79935-cd39-480a-8a44-06b70f36f24c";
+const char MOUSE_NAME[] = "Ed's Mouse 🐢";
+
+#elif defined(ZACHS_MOUSE)
+const char FLAG_CHARACTERISTIC_ID[] = "1fe79935-cd39-480a-8a44-06b70f36f24a";
+const char DIRECTIONS_CHARACTERISTIC_ID[] = "1fe79935-cd39-480a-8a44-06b70f36f24c";
+const char MOUSE_NAME[] = "Zach's Mouse 🐳";
+
+#elif defined(MACHIS_MOUSE)
+const char FLAG_CHARACTERISTIC_ID[] = "2fe79935-cd39-480a-8a44-06b70f36f24a";
+const char DIRECTIONS_CHARACTERISTIC_ID[] = "2fe79935-cd39-480a-8a44-06b70f36f24c";
+const char MOUSE_NAME[] = "Machi's Mouse 🦑";
+
+#endif
+
+/**
+ * Miscellaneous Constants
+ */
 constexpr uint16_t PRINT_DELAY_MS = 500;
 constexpr float ENCODER_TICKS_PER_INCH = 84.91667; // TODO: improve
 
-// Pins
+/**
+ * Pins
+ */
 constexpr uint8_t BUZZER_PIN = 10;
 
-// PID Constansts
+/**
+ * PID Constants
+ */
 typedef struct PIDConstants_t {
   float kp = 0;
   float ki = 0;
@@ -50,6 +94,8 @@ constexpr float DEGREE_THRESHOLD = 2;
 constexpr float SETTLING_TIME = 0.35; // Seconds
 constexpr float PID_TIMEOUT = 5; // Seconds
 
-// Robot Dimensions
+/**
+ * Robot Dimensions
+ */
 constexpr float ROBOT_HEIGHT_INCHES = 3; // Distance from line sensor to wheels
 constexpr float ROBOT_RADIUS_INCHES = 1.5625;
