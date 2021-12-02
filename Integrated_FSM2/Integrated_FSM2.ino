@@ -50,8 +50,8 @@ void driveForward(double distanceInches);
 
 // create switch characteristic and allow remote device to read and write
 BLEService mazeService("0fe79935-cd39-480a-8a44-06b70f36f248"); //Integrated Code
-BLEUnsignedCharCharacteristic flagCharacteristic("1fe79935-cd39-480a-8a44-06b70f36f24a", BLERead | BLEWrite | BLENotify); //Integrated Code
-BLEStringCharacteristic directionsCharacteristic("1fe79935-cd39-480a-8a44-06b70f36f24c", BLERead | BLEWrite, 100); //Integrated Code
+BLEUnsignedCharCharacteristic flagCharacteristic("0fe79935-cd39-480a-8a44-06b70f36f24a", BLERead | BLEWrite | BLENotify); //Integrated Code
+BLEStringCharacteristic directionsCharacteristic("0fe79935-cd39-480a-8a44-06b70f36f24c", BLERead | BLEWrite, 100); //Integrated Code
 String directions; //Integrated Code
 bool   hasConnected;  //Integrated Code
 bool   hasFirstMessage; // Integrated Code
@@ -61,8 +61,6 @@ bool   asked4directions;  // Integrated Code
 void setup() {
   state = State::AWAITING_INSTRUCTIONS; //ensure desired intital state
   Serial.begin(9600);
-
-  Songs::playStarWarsTheme();
 
   bluetooth_init(); //Integrated Code
   //Request Directions form Jetson
@@ -107,6 +105,8 @@ void loop() {
 
         if (directions == "None")
         {
+          Songs::playMarioTheme();
+          directions = "SDIR:";
           enterFollowingLineState();
         }
         else//directions available
@@ -157,8 +157,9 @@ void loop() {
       transmittingDirectionsActions();
       //after confirmed directions transmitted successfully
       //enterFinishedState();
-      if(flagCharacteristic.value() == 5)//its either 5 or 6, if this does not work try 6
+      if(flagCharacteristic.value() == 3)
       {
+        Songs::playStarWarsTheme();
         enterFinishedState();
       }
       break;
@@ -679,7 +680,7 @@ void bluetooth_init()
   // Set the connection interval to be as fast as possible (about 40 Hz)
   BLE.setConnectionInterval(0x0006, 0x0050);
 
-  BLE.setLocalName("Zach's Mouse :)");
+  BLE.setLocalName("Edward's Mouse :)");
   BLE.setAdvertisedService(mazeService);
   mazeService.addCharacteristic(flagCharacteristic);
   mazeService.addCharacteristic(directionsCharacteristic);
