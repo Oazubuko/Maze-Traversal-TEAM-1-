@@ -99,6 +99,8 @@ void loop() {
         Songs::playSound(NOTE_C4);
 
         if (directions == NO_DIRECTIONS) {
+          Songs::playMarioTheme();
+          directions = "SDIR:";
           enterFollowingLineState();
         } else {
           //directions available
@@ -120,7 +122,7 @@ void loop() {
 
       if (identifiedJunction != Junction::UNKNOWN) {
         if (identifiedJunction == Junction::END_OF_MAZE) {
-          enterFinishedState();
+          enterTransmittingDirectionsState();
         } else if (identifiedJunction == Junction::LINE) {
           enterFollowingLineState();
         } else {
@@ -143,15 +145,16 @@ void loop() {
       break;
 
     case State::OPTIMIZED_MAZE_RUN:
-      // TODO: add actions and transitions
+      optimizedMazeRunActions();
       break;
 
     case State::TRANSMITTING_DIRECTIONS:
       transmittingDirectionsActions();
       
       //after confirmed directions transmitted successfully, enterFinishedState();
-      if(flagCharacteristic.value() == 5)//its either 5 or 6, if this does not work try 6
+      if(flagCharacteristic.value() == 3)
       {
+        Songs::playJingleBells();
         enterFinishedState();
       }
       break;
@@ -331,6 +334,61 @@ void enterFinishedState() {
 }
 
 void finishedActions() {
+}
+
+/**
+ * Optimized Maze Run State
+ */
+ 
+void optimizedMazeRunActions() 
+{
+  //directions
+  int len = directions.length();
+  for(int i=0;i<len;i++)
+  {
+      //Drive forward until the next junction is reached
+      //driveUntilJunction();//Need Replace
+      char current=directions.charAt(i);
+      Serial.print(directions);
+      Serial.print("current = ");
+      Serial.println(current);
+  
+      switch (current) 
+      {
+          case 'B':
+             buzzer.sound(NOTE_E7, 200);
+             //turnAngle(180);
+             turnToAngle(180);
+          break;//case 'B':      
+
+          case 'R':
+             buzzer.sound(NOTE_G7, 200);
+             //centerOnJunction();//May need to replace
+             //turnAngle(-90);
+             turnToAngle(-90);
+          break;//case 'R':
+
+          case 'L':
+            buzzer.sound(NOTE_B7, 200);
+            //centerOnJunction();//May need to replace
+            //turnAngle(90);
+            turnToAngle(90);
+          break;//case 'L':
+
+          case 'S':
+          default:
+            buzzer.sound(NOTE_A7, 200);
+            //Drive forward until the next junction is reached
+            //driveUntilJunction();//Need Replace
+          break;
+      }//End of switch (junction)
+
+  }//End of for(int i=0;i<len;i++)
+  //Drive forward until the next junction is reached
+  //driveUntilJunction();//Need Replace
+  //Triggers after End of Maze detected in order to drive into goal area
+  //driveStraight(4.0);//Is this still needed?
+
 }
 
 /**
