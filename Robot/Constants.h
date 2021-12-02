@@ -52,6 +52,10 @@ const char MOUSE_NAME[] = "Machi's Mouse 🦑";
 constexpr uint16_t PRINT_DELAY_MS = 500;
 constexpr float ENCODER_TICKS_PER_INCH = 84.91667; // TODO: improve
 
+// Number of consecutive line readings of a given type before
+// committing to a line reading.
+constexpr unsigned int LINE_CONFIDENCE_THRESHOLD = 4;
+
 /**
  * Pins
  */
@@ -67,13 +71,13 @@ typedef struct PIDConstants_t {
 } PIDConstants;
 
 #ifndef NO_BATTERY
-constexpr PIDConstants LEFT_MOTOR_POSITION_CONSTANTS = { 0.3, 0.3, 0.01 }; // 0.125, 0.03, 0.01 };
-constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.3, 0.3, 0.01 }; // 0.11, 0.03, 0.0075 };
-constexpr PIDConstants TURN_CONSTANTS = { 0.15, 0.001, 0.025 };
+constexpr PIDConstants LEFT_MOTOR_POSITION_CONSTANTS = { 0.3, 0.3, 0.01 };
+constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.3, 0.3, 0.01 };
+constexpr PIDConstants TURN_CONSTANTS = { 0.14, 0, 0 };
 constexpr float SKEW_ADJUSTMENT_FACTOR = 4;
 constexpr float ANGLE_ADJUSTMENT_FACTOR = 0.2;
 constexpr float SPEED_THROTTLE = 0.45; // % of max motor speed
-constexpr float BASE_SPEED = 13; // Inches / sec
+constexpr float BASE_SPEED = 15; // Inches / sec
 constexpr float ID_JUNCTION_SPEED = 8; // Inches / sec
 constexpr float MAX_TURN_SPEED = 13; // Inches / sec
 #else
@@ -90,7 +94,7 @@ constexpr float MAX_TURN_SPEED = 13; // Inches / sec
 
 constexpr int PID_SAMPLE_PERIOD_MS = 10;
 constexpr float DISTANCE_THRESHOLD_INCHES = 0.25;
-constexpr float DEGREE_THRESHOLD = 2;
+constexpr float DEGREE_THRESHOLD = 3;
 constexpr float SETTLING_TIME = 0.35; // Seconds
 constexpr float PID_TIMEOUT = 5; // Seconds
 

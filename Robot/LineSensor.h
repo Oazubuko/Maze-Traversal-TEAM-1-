@@ -24,6 +24,16 @@ enum class LineReading {
   UNKNOWN       // Any other configuration
 };
 
+/**
+ * Summarizes the last few line readings and how confident we are in 
+ * the latest reading
+ */
+typedef struct LineHistory_t {
+  LineReading lastConfidentReading = LineReading::LINE;
+  LineReading lastReading = LineReading::UNKNOWN;
+  unsigned int confidence = 0;
+} LineHistory;
+
 class LineSensor {
   public:
     constexpr static uint8_t SENSOR_COUNT = 13;
@@ -42,6 +52,7 @@ class LineSensor {
     uint8_t _rightADCPin;
     Adafruit_MCP3008 _leftADC;
     Adafruit_MCP3008 _rightADC;
+    LineHistory lineHistory;
 
   public:
     LineSensor(uint8_t leftADCPin, uint8_t rightADCPin) :
@@ -138,54 +149,32 @@ class LineSensor {
       Serial.println("Reflectances w/ cutoff (" + String(MAX_TAPE_REFLECTANCE) + "): ");
       String pinLabels;
       String message;
-      
+
       for (int i = SENSOR_COUNT; i >= 1; i--) {
         message += getReflectanceAt(i);
         message += '\t';
-        
+
         pinLabels += i;
         pinLabels += '\t';
       }
-            
+
       Serial.println(pinLabels);
       Serial.println(message);
     }
 
     /**
-       Summarizes a reading from the line sensor
+       Classifies a reading from the line sensor. This function will only return a new
+       line reading after seeing enough "evidence" that we've truly seen that reading.
+
+       For example, if the sensor sees a single LEFT line reading, then many FULL line readings,
+       it will never return LineReading::LEFT, only LineReading::FULL after enough evidence.
     */
     LineReading getReading() {
-      // Here, we don't use the countLeftTape() and countRightTape() functions
-      // because we don't want to include the middle left/right sensors when
-      // checking for left/right turns. The middle sensors are regularly during
-      // regular line following, which isn't what we want.
-      int rightCount = countTapeBetween(1, CENTER_RIGHT_PIN - 1);
-      int centerCount = countTapeBetween(CENTER_RIGHT_PIN, CENTER_LEFT_PIN);
-      int leftCount = countTapeBetween(CENTER_LEFT_PIN + 1, SENSOR_COUNT);
-      int totalCount = leftCount + rightCount + centerCount;
+      LineReading newReading = getInstantaneousReading();
 
-//      Serial.println("Tape counts: (L=" + String(leftCount) + ", C=" + String(centerCount) + ", R=" + String(rightCount) + ")");
+      updateLineHistory(newReading);
 
-      // Determine sensor result based on the location of the tape
-      if (totalCount == 0) {
-        return LineReading::EMPTY;
-      }
-      if (centerCount == 3 && (2 <= leftCount && leftCount <= 3) && (2 <= rightCount && rightCount <= 3) ) {
-        return LineReading::END_OF_MAZE;
-      }
-      if (leftCount >= TAPE_COUNT_THRESHOLD && rightCount >= TAPE_COUNT_THRESHOLD) {
-        return LineReading::FULL;
-      }
-      if (leftCount >= TAPE_COUNT_THRESHOLD) {
-        return LineReading::LEFT;
-      }
-      if (rightCount >= TAPE_COUNT_THRESHOLD) {
-        return LineReading::RIGHT;
-      }
-
-      return LineReading::LINE;
-
-      // TODO: add in UNKNOWN line readings?
+      return lineHistory.lastConfidentReading;
     }
 
     static void printLineReading(LineReading lineReading) {
@@ -215,7 +204,7 @@ class LineSensor {
       }
     }
 
-    
+
     /**
        Determine the value below which a sensor reading will be considered white tape.
 
@@ -282,6 +271,18 @@ class LineSensor {
       Serial.println("Finished calculating tape cutoff: " + String(MAX_TAPE_REFLECTANCE));
     }
 
+    void printLineHistory() {
+      Serial.println("Line History: ");
+      
+      Serial.print("\tLast Reading: " + String(lineHistory.confidence) + "x "); 
+      printLineReading(lineHistory.lastReading);
+      
+      Serial.print("\tLast Confident Reading: ");
+      printLineReading(lineHistory.lastConfidentReading);
+
+      Serial.println();
+    }
+
   private:
     /**
        Returns the number of sensors with tape between the start and end index (inclusive)
@@ -331,5 +332,59 @@ class LineSensor {
       }
 
       return minReflectance;
+    }
+
+    /**
+       Adds a new sensor reading to the line history. If we've observed enough evidence
+       of a particular line reading, update our last confident reading.
+    */
+    void updateLineHistory(LineReading newReading) {
+      if (newReading == lineHistory.lastReading) {
+        lineHistory.confidence++;
+      } else {
+        lineHistory.lastReading = newReading;
+        lineHistory.confidence = 1;
+      }
+
+      if (lineHistory.confidence >= LINE_CONFIDENCE_THRESHOLD) {
+        lineHistory.lastConfidentReading = lineHistory.lastReading;
+      }
+    }
+
+    /**
+       Classifies a reading from the line sensor immediately
+    */
+    LineReading getInstantaneousReading() {
+      // Here, we don't use the countLeftTape() and countRightTape() functions
+      // because we don't want to include the middle left/right sensors when
+      // checking for left/right turns. The middle sensors are regularly during
+      // regular line following, which isn't what we want.
+      int rightCount = countTapeBetween(1, CENTER_RIGHT_PIN - 1);
+      int centerCount = countTapeBetween(CENTER_RIGHT_PIN, CENTER_LEFT_PIN);
+      int leftCount = countTapeBetween(CENTER_LEFT_PIN + 1, SENSOR_COUNT);
+      int totalCount = leftCount + rightCount + centerCount;
+
+//      Serial.println("Tape counts: (L=" + String(leftCount) + ", C=" + String(centerCount) + ", R=" + String(rightCount) + ")");
+
+      // Determine sensor result based on the location of the tape
+      if (totalCount == 0) {
+        return LineReading::EMPTY;
+      }
+      if (centerCount == 3 && (1 <= leftCount && leftCount <= 3) && (1 <= rightCount && rightCount <= 3) ) {
+        return LineReading::END_OF_MAZE;
+      }
+      if (leftCount >= TAPE_COUNT_THRESHOLD && rightCount >= TAPE_COUNT_THRESHOLD) {
+        return LineReading::FULL;
+      }
+      if (leftCount >= TAPE_COUNT_THRESHOLD) {
+        return LineReading::LEFT;
+      }
+      if (rightCount >= TAPE_COUNT_THRESHOLD) {
+        return LineReading::RIGHT;
+      }
+
+      return LineReading::LINE;
+
+      // TODO: add in UNKNOWN line readings?
     }
 };
