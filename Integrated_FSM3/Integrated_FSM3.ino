@@ -46,7 +46,7 @@ void turnByAngle(double angleIncrement);
 void handleFatalError(String errorMessage);
 void updateLineSensorHistory();
 int pickTurnAngle();
-int angleFromDirections();
+Junction junctionFromDirections(LineReading latestLineReading);
 void driveForward(double distanceInches);
 
 // create switch characteristic and allow remote device to read and write
@@ -124,7 +124,7 @@ void loop() {
       else if ( (lineReading != LineReading::LINE)&&(current_position>=0)&&(current_position<directions.length() ) )
       {
         //Transition to FOLLOWING_DIRECTIONS state
-        enterFollowingDirectionsState();
+        enterFollowingDirectionsState(lineReading);
       }
       else if ( (lineReading != LineReading::LINE)&&(current_position>=0)&&(current_position>=directions.length() ) )
       {
@@ -158,11 +158,18 @@ void loop() {
 
     case State::FOLLOWING_DIRECTIONS:
       followingDirectionsActions();
-      current_position++;
-      if (turnController.ReachedSetpoint()) {
-        turnController.Print();
-        enterFollowingLineState();
+      if (identifiedJunction != Junction::UNKNOWN) 
+      {
+        if (identifiedJunction == Junction::END_OF_MAZE) {
+          enterFinishedState();
+        } else if (identifiedJunction == Junction::LINE) {
+          enterFollowingLineState();
+        } else {
+          current_position++;
+          enterTurningState();
+        }
       }
+      
       break;
 
     //case State::OPTIMIZED_MAZE_RUN:
@@ -332,33 +339,82 @@ void turningActions() {
 /**
    Following Directions State
 */
-void enterFollowingDirectionsState() {
-  state = State::FOLLOWING_DIRECTIONS;
+void enterFollowingDirectionsState(LineReading latestLineReading) {
+  state = State::IDENTIFYING_JUNCTION;
 
   leftMotorController.reset();
   rightMotorController.reset();
 
-  headingAngle = gyro.getAngle();
+  firstLineReading = latestLineReading;
+  identifiedJunction = Junction::UNKNOWN;
 
-  leftMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
-  rightMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
+  switch (firstLineReading) {
+    // Empty line readings are always dead ends
+    case LineReading::EMPTY:
+      identifiedJunction = Junction::DEAD_END;
+      playToneFor(identifiedJunction);
+      break;
 
-  // Set target angle setpoint
-  turnController.Reset();
-  leftMotorController.reset();
-  rightMotorController.reset();
-  float targetAngle = gyro.getAngle() + angleFromDirections();//angleFromDirections() replaces pickTurnAngle()
-  turnController.SetSetpoint(targetAngle);
+    case LineReading::END_OF_MAZE:
+      identifiedJunction = Junction::END_OF_MAZE;
+      playToneFor(identifiedJunction);
+      break;
+
+    case LineReading::LINE:
+      Serial.println("Anakin, you were supposed to follow the lines, not identify them!");
+      identifiedJunction = Junction::LINE;
+      playToneFor(identifiedJunction);
+      break;
+
+    // Unknown junctions are tricky to deal with--let's just play an error
+    // tone and treat it like a line
+    case LineReading::UNKNOWN:
+      Serial.println("Encountered unknown junction--treating it as a line");
+      identifiedJunction = Junction::LINE;
+      Songs::playErrorSong();
+      break;
+
+    // A single one of these readings is ambiguous, so we need to get another check
+    // before determining the junction type
+    case LineReading::FULL:
+    case LineReading::LEFT:
+    case LineReading::RIGHT:
+      // Center the robot's rotation point on the middle of the junction. There,
+      // we'll take the final measurement to disambiguate the junction type
+      headingAngle = gyro.getAngle();
+
+      leftMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
+      rightMotorController.setMaxPosition(ROBOT_HEIGHT_INCHES);
+      break;
+
+    default:
+      LineSensor::printLineReading(latestLineReading);
+      handleFatalError("Found an impossible line reading!!!");
+      break;
+  }
 }
 
 //currently functionally identical to turningActions
 void followingDirectionsActions() {
-  // Actions: Update L and R motor speeds using PID computation
-  double motorSpinSpeed = turnController.Compute(gyro.getAngle());
-  updateMotorSpeeds(-motorSpinSpeed, motorSpinSpeed);
+  // Drive both motors straight, correcting for slight errors in heading
+  double angularAdjustment = (gyro.getAngle() - headingAngle) * ANGLE_ADJUSTMENT_FACTOR;
+  double leftSpeed = BASE_SPEED + angularAdjustment;
+  double rightSpeed = BASE_SPEED - angularAdjustment;
+  updateMotorSpeeds(leftSpeed, rightSpeed);
 
-  if (turnController.ReachedSetpoint()) {
-    gyro.alignWithCardinalDirection();
+  if (leftMotorController.reachedMaxPosition() && rightMotorController.reachedMaxPosition()) {
+    leftMotor.stop();
+    rightMotor.stop();
+
+    if( (firstLineReading!=LineReading::LINE)&&(firstLineReading!=LineReading::UNKNOWN) )
+    {
+        identifiedJunction = junctionFromDirections();
+    }
+    else
+    {
+        identifiedJunction = Junction::LINE;
+    }
+    playToneFor(identifiedJunction);
   }
 }
 
@@ -486,7 +542,7 @@ int pickTurnAngle() {
    Implements maze-solving logic by determining how much to turn based on
    the current program state.
 */
-int angleFromDirections() {
+Junction junctionFromDirections() {
   //current_position = 0;
     //directions
   //int len = directions.length();
@@ -499,31 +555,31 @@ int angleFromDirections() {
   {
      case 'B':
         buzzer.sound(NOTE_E7, 200);
-        return 180;
+        return Junction::DEAD_END;
      break;//case 'B':      
 
      case 'R':
         buzzer.sound(NOTE_G7, 200);
-        return (-90);
+        return Junction::RIGHT;
       break;//case 'R':
 
       case 'L':
          buzzer.sound(NOTE_B7, 200);
-         return 90;
+         return Junction::LEFT;
       break;//case 'L':
 
       case 'S':
          buzzer.sound(NOTE_A7, 200);
-         return 0;
+         return Junction::LINE;
       break;
 
       default:
          handleFatalError("Invalid junction type while picking the next turn angle");
-         return 0;
+         return Junction::UNKNOWN;
       break;
   }//End of switch (current)
   
-}//End of int angleFromDirections()
+}//End of int junctionFromDirections()
 
 
 /**
