@@ -340,7 +340,7 @@ void turningActions() {
    Following Directions State
 */
 void enterFollowingDirectionsState(LineReading latestLineReading) {
-  state = State::IDENTIFYING_JUNCTION;
+  state = State::FOLLOWING_DIRECTIONS;
 
   leftMotorController.reset();
   rightMotorController.reset();
