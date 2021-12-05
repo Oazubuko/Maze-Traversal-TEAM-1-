@@ -47,7 +47,7 @@ class connection:
         self.dir_characteristic  = dir_characteristic
         self.connected = False
         self.mouse_addr_Ed    = "60:CF:2D:45:3B:1B"
-        self.mouse_addr_Zach  = "5B:FD:4B:44:C7:3E"
+        self.mouse_addr_Zach  = "35:BA:0C:91:CE:CC"
         self.mouse_addr_Machi = "B0:83:0B:D4:2B:70"
         self.mouse_addr_Loaner = "2C:72:52:BE:CC:0D"
         global Connected
@@ -83,7 +83,7 @@ class connection:
                 Connected = True
                 if self.connected_device == "60:CF:2D:45:3B:1B": 
                     print("Connected to Ed's Mouse \n")
-                elif self.connected_device == "5B:FD:4B:44:C7:3E": 
+                elif self.connected_device == "35:BA:0C:91:CE:CC": 
                     print("Connected to Zach's Mouse \n")
                 elif self.connected_device == "B0:83:0B:D4:2B:70":
                     print("Connected to Machi's Mouse \n")
