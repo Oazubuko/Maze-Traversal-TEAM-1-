@@ -59,7 +59,7 @@ bool   hasFinished; // Integrated Code
 bool   asked4directions;  // Integrated Code
 
 void setup() {
-  state = State::AWAITING_INSTRUCTIONS; //ensure desired intital state
+  state = State::FOLLOWING_LINE; //ensure desired intital state
   Serial.begin(9600);
 
   bluetooth_init(); //Integrated Code

@@ -81,8 +81,22 @@ class Gyro {
        the angle to the range [0, 360)
     */
     void alignWithCardinalDirection() {
+      setAngle(getCardinalAngle());
+    }
+    
+    /**
+       Returns the current angle to the closest multiple of 90 degrees. Limits
+       the angle to the range [0, 360)
+    */
+    int getCardinalAngle() {
       int closestMultiple = round(_currentAngle / 90);
-      setAngle(90 * (closestMultiple % 4));
+      int angle = 90 * (closestMultiple % 4);
+
+      if (angle < 0) {
+        angle += 360;
+      }
+      
+      return angle;
     }
 
 
@@ -91,7 +105,12 @@ class Gyro {
      */
     void update() {
       if (IMU.gyroscopeAvailable()) {
-        _currentAngle += getAngularSpeed() * _integrationTimer.lap();
+        float dt = _integrationTimer.lap();
+        float speed = getAngularSpeed();
+        _currentAngle += speed * dt;
+
+        // TODO: undo these changes
+        Serial.println("gyro dt, speed, angle: " + String(dt) + + ", " + String(speed) + ", " + String(_currentAngle));
       }
     }
 

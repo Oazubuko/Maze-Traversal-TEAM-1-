@@ -14,15 +14,18 @@
 #include "StateMachine.h"
 
 // Global state / data
-State state = State::AWAITING_INSTRUCTIONS;
+State state = State::FOLLOWING_LINE;
 int loopCount = 0;
 Junction identifiedJunction = Junction::LINE;
 LineReading firstLineReading = LineReading::LINE;
 float headingAngle = 0; // Start angle while centering on junction
+
+// Maze state
 float time0;
 float time1;
-int r=5, c=5;
-int maze[11][11]={0};
+int r = MAZE_ROWS / 2;
+int c = MAZE_COLS / 2;
+int maze[MAZE_ROWS][MAZE_COLS] = {0};
 int cells;
 int mflag = 0;
 
@@ -54,17 +57,19 @@ void updateLineSensorHistory();
 int pickTurnAngle();
 Junction junctionFromDirections(LineReading latestLineReading);
 void driveForward(double distanceInches);
+void printMaze();
+void updateMaze();
 
 // create switch characteristic and allow remote device to read and write
 BLEService mazeService(MAZE_SERVICE_ID); //Integrated Code
 BLEUnsignedCharCharacteristic flagCharacteristic(FLAG_CHARACTERISTIC_ID, BLERead | BLEWrite | BLENotify); //Integrated Code
 BLEStringCharacteristic directionsCharacteristic(DIRECTIONS_CHARACTERISTIC_ID, BLERead | BLEWrite, 100); //Integrated Code
-String directions       = NO_DIRECTIONS;  //Integrated Code
+String directions(NO_DIRECTIONS);         //Integrated Code
 bool   hasConnected     = false;          //Integrated Code
 bool   hasFirstMessage  = false;          // Integrated Code
 bool   hasFinished      = false;          // Integrated Code
 bool   asked4directions = false;          // Integrated Code
-int current_position = 0;                 // Integrated Code
+int current_position = -1;                // Integrated Code
 
 void setup() {
   Serial.begin(9600);
@@ -108,7 +113,7 @@ void loop() {
 
         if (directions == NO_DIRECTIONS) {
           Songs::playMarioTheme();
-          directions = "";
+          directions = ""; // The directions will be filled in as we traverse the maze
           current_position = -1;
           enterFollowingLineState();
         } else {
@@ -123,19 +128,17 @@ void loop() {
     case State::FOLLOWING_LINE:
       followingLineActions();
 
-      if ( (lineReading != LineReading::LINE)&&(current_position<0) ) 
-      {
-        enterIdentifyingJunctionState(lineReading);
-      }
-      else if ( (lineReading != LineReading::LINE)&&(current_position>=0)&&(current_position<directions.length() ) )
-      {
-        //Transition to FOLLOWING_DIRECTIONS state
-        enterFollowingDirectionsState(lineReading);
-      }
-      else if ( (lineReading != LineReading::LINE)&&(current_position>=0)&&(current_position>=directions.length() ) )
-      {
-        //Transition to FOLLOWING_DIRECTIONS state
-        enterFinishedState();
+      if (lineReading != LineReading::LINE) {
+        if (current_position < 0) {
+          // There are no directions to follow
+          enterIdentifyingJunctionState(lineReading);
+        } else if (current_position >= 0 && current_position < directions.length()) {
+          // There are still directions to follow
+          enterFollowingDirectionsState(lineReading);
+        } else {
+          // Received last direction -- at the end of the maze!
+          enterFinishedState();
+        }
       }
       break;
 
@@ -148,60 +151,8 @@ void loop() {
         } else if (identifiedJunction == Junction::LINE) {
           enterFollowingLineState();
         } else {
-          Serial.println("Row and Column");
-          Serial.print(r);
-          Serial.print(" ");
-          Serial.println(c);
-      
-          
-          Serial.println("maze");
-          Serial.println("Col0123456789ten");
-
-          for(int j = 0; j < 11; j++){
-            Serial.print("row: ");
-                for(int i = 0; i < 11; i++){
-                     Serial.print(maze[j][i]);
-                     }
-                Serial.println(" ");
-                }
-         mflag++;
+          updateMaze();          
           enterTurningState();
-          int card = gyro.getCardinalDirectionAngle();
-          if( card == 90 || card == -270){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
-            for(int i = 0; i < cells; i++){
-              if(maze[r][c-i]==0){maze[r][c-i]= 1;}
-              else{maze[r][c-i]= 2;}
-              } 
-              c=c-cells;}
-          else if(card == -90 || card == 270){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
-            for(int i = 0; i < cells; i++){
-              if(maze[r][c+i]==0){maze[r][c+i]= 1;}
-              else{maze[r][c+i]= 2;}
-              } 
-              c=c+cells;}
-          else if(abs(card) == 180){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
-            for(int i = 0; i < cells; i++){
-              if(maze[r-i][c]==0){maze[r-i][c]= 1;}
-              else{maze[r-i][c]= 2;}
-              } 
-            r=r-cells;}
-          else if(card == 0){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
-            for(int i = 0; i < cells; i++){
-              if(maze[r+i][c]==0){maze[r+i][c]= 1;}
-              else{maze[r+i][c]= 2;}
-              } 
-            r=r+cells;}
-            
-
-            
-          else{Serial.print("ERROR: Invalid Cardinal: ");Serial.println(card); Songs::playMarioTheme(); delay(100000);}
-          Serial.println("new Row and Column!");
-          Serial.print(r);
-          Serial.print(" ");
-          Serial.println(c);
-          Serial.print("Cells added ");
-          Serial.println(cells);        
-          
         }
       }
       break;
@@ -210,7 +161,6 @@ void loop() {
       turningActions();
 
       if (turnController.ReachedSetpoint()) {
-        turnController.Print();
         enterFollowingLineState();
       }
       break;
@@ -272,7 +222,6 @@ void awaitingInstructionsActions()
   if (hasConnected && !asked4directions) {
     flagCharacteristic.setValue(2);
     asked4directions = true;
-    Serial.println("Inside awaiting instructions"); // TODO: removed
   }
 }//End of void awaitingInstructionsActions()
 
@@ -376,9 +325,6 @@ void identifyingJunctionActions(LineReading latestLineReading) {
    Turning State
 */
 void enterTurningState() {
-  time1 = micros()*(1e-6);
-  time1 = time1-time0;
-  cells = round(time1);
   state = State::TURNING;
 
   // Set target angle setpoint
@@ -595,7 +541,7 @@ int pickTurnAngle() {
       return 180;
 
     default:
-      handleFatalError("Invalid junction type while picking the next turn angle");
+      handleFatalError("Invalid junction type while picking the next turn angle: " + junctionAsString(identifiedJunction));
       return 0;
   }
 }//End of int pickTurnAngle()
@@ -610,7 +556,7 @@ Junction junctionFromDirections() {
     //directions
   //int len = directions.length();
   char current=directions.charAt(current_position);
-  Serial.print(directions);
+  Serial.println(directions);
   Serial.print("current = ");
   Serial.println(current);
   
@@ -619,30 +565,72 @@ Junction junctionFromDirections() {
      case 'B':
         buzzer.sound(NOTE_E7, 200);
         return Junction::DEAD_END;
-     break;//case 'B':      
 
      case 'R':
         buzzer.sound(NOTE_G7, 200);
         return Junction::RIGHT;
-      break;//case 'R':
 
       case 'L':
          buzzer.sound(NOTE_B7, 200);
          return Junction::LEFT;
-      break;//case 'L':
 
       case 'S':
          buzzer.sound(NOTE_A7, 200);
          return Junction::LINE;
-      break;
 
       default:
-         handleFatalError("Invalid junction type while picking the next turn angle");
+         handleFatalError("Invalid direction: " + current);
          return Junction::UNKNOWN;
-      break;
   }//End of switch (current)
   
 }//End of int junctionFromDirections()
+
+/**
+ * Updates the robot's current position in the maze. 
+ */
+void updateMaze() {
+    // Compute how many cells we've traveled
+    time1 = micros()*(1e-6);
+    time1 = time1-time0;
+    cells = round(time1);
+    
+    mflag++;
+    
+    int cardinalAngle = gyro.getCardinalAngle();
+  
+    // mflag controls whether we fill in gaps between a junction or not
+    if (mflag == 1) {
+      cells = 1;
+    }
+  
+    // "Visit" all cells in between the last and the current one
+    for (int i = 0; i < cells; i++) {
+        // Add 1 to visited cell count
+        maze[r][c]++;
+  
+        if (cardinalAngle == 0) {
+          r--;
+        } else if (cardinalAngle == 90) {
+          c--;
+        } else if (cardinalAngle == 180) {
+          r++;
+        } else if (cardinalAngle == 270) {
+          c++;
+        } else {
+          handleFatalError("ERROR: Invalid Cardinal Angle: " + String(cardinalAngle));
+        }
+    }
+    
+    Serial.println("new Row and Column!");
+    Serial.print(r);
+    Serial.print(" ");
+    Serial.println(c);
+    Serial.print("Cells added ");
+    Serial.println(cells);  
+    
+    Serial.println("Current Maze: ");
+    printMaze();
+}
 
 
 /**
@@ -703,7 +691,7 @@ void printStatus() {
     Serial.print("Current Position: "); posEstimator.print();
     Serial.print("Line Sensor Vals: "); lineSensor.printAllSensorValues();
     Serial.print("Left Motor Controller: "); leftMotorController.print();
-    Serial.print("Right Motor Controller: "); leftMotorController.print();
+    Serial.print("Right Motor Controller: "); rightMotorController.print();
     Serial.println();
 
     prevStates.clear();
@@ -727,6 +715,32 @@ void printStates(std::vector<State>& states) {
   }
 
   Serial.println(stateString);
+}
+
+void printMaze() {
+  String columnLabels("  \t");
+  for (int col = 0; col < MAZE_COLS; col++) {
+    columnLabels += col;
+    
+    // Add 1 or 2 spaces depending on how whehter the current column is 1 or 2 digits.
+    // This functionality will break if the number of columns exceeds 99.
+    columnLabels += (col < 10) ? "  " : " ";
+  }
+  
+  String mazeString;
+  for (int row = 0; row < MAZE_ROWS; row++) {
+    mazeString += row;
+    mazeString += '\t';
+    
+    for (int col = 0; col < MAZE_COLS; col++) {
+      mazeString += maze[row][col];
+      mazeString += "  "; // 2 spaces
+    }
+    mazeString += '\n';
+  }
+
+  Serial.println(columnLabels);
+  Serial.println(mazeString);
 }
 
 /**

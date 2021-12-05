@@ -22,12 +22,6 @@
  */
 const char MAZE_SERVICE_ID[] = "0fe79935-cd39-480a-8a44-06b70f36f248";
 const char NO_DIRECTIONS[] = "None";
-enum FlagCharacteristicVals { // TODO figure out what A, B, and C are!
-  A = -1,
-  B = 1,
-  C = 2,
-  D = 4
-};
 
 #if defined(EDS_MOUSE)
 const char FLAG_CHARACTERISTIC_ID[] = "0fe79935-cd39-480a-8a44-06b70f36f24a";
@@ -73,7 +67,7 @@ typedef struct PIDConstants_t {
 #ifndef NO_BATTERY
 constexpr PIDConstants LEFT_MOTOR_POSITION_CONSTANTS = { 0.3, 0.3, 0.01 };
 constexpr PIDConstants RIGHT_MOTOR_POSITION_CONSTANTS = { 0.3, 0.3, 0.01 };
-constexpr PIDConstants TURN_CONSTANTS = { 0.14, 0, 0 };
+constexpr PIDConstants TURN_CONSTANTS = { 0.13, 0, 0 };
 constexpr float SKEW_ADJUSTMENT_FACTOR = 4;
 constexpr float ANGLE_ADJUSTMENT_FACTOR = 0.2;
 constexpr float SPEED_THROTTLE = 0.45; // % of max motor speed
@@ -94,7 +88,7 @@ constexpr float MAX_TURN_SPEED = 13; // Inches / sec
 
 constexpr int PID_SAMPLE_PERIOD_MS = 10;
 constexpr float DISTANCE_THRESHOLD_INCHES = 0.25;
-constexpr float DEGREE_THRESHOLD = 3;
+constexpr float DEGREE_THRESHOLD = 5;
 constexpr float SETTLING_TIME = 0.35; // Seconds
 constexpr float PID_TIMEOUT = 5; // Seconds
 
@@ -103,3 +97,9 @@ constexpr float PID_TIMEOUT = 5; // Seconds
  */
 constexpr float ROBOT_HEIGHT_INCHES = 3; // Distance from line sensor to wheels
 constexpr float ROBOT_RADIUS_INCHES = 1.5625;
+
+/**
+ * Maze Constants
+ */
+constexpr unsigned int MAZE_ROWS = 45;
+constexpr unsigned int MAZE_COLS = 45;
