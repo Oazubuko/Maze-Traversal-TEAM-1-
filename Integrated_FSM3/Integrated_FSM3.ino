@@ -19,6 +19,12 @@ int loopCount = 0;
 Junction identifiedJunction = Junction::LINE;
 LineReading firstLineReading = LineReading::LINE;
 float headingAngle = 0; // Start angle while centering on junction
+float time0;
+float time1;
+int r=5, c=5;
+int maze[11][11]={0};
+int cells;
+int mflag = 0;
 
 // Global objects
 LineSensor lineSensor(A3, A2);
@@ -142,7 +148,60 @@ void loop() {
         } else if (identifiedJunction == Junction::LINE) {
           enterFollowingLineState();
         } else {
+          Serial.println("Row and Column");
+          Serial.print(r);
+          Serial.print(" ");
+          Serial.println(c);
+      
+          
+          Serial.println("maze");
+          Serial.println("Col0123456789ten");
+
+          for(int j = 0; j < 11; j++){
+            Serial.print("row: ");
+                for(int i = 0; i < 11; i++){
+                     Serial.print(maze[j][i]);
+                     }
+                Serial.println(" ");
+                }
+         mflag++;
           enterTurningState();
+          int card = gyro.getCardinalDirectionAngle();
+          if( card == 90 || card == -270){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
+            for(int i = 0; i < cells; i++){
+              if(maze[r][c-i]==0){maze[r][c-i]= 1;}
+              else{maze[r][c-i]= 2;}
+              } 
+              c=c-cells;}
+          else if(card == -90 || card == 270){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
+            for(int i = 0; i < cells; i++){
+              if(maze[r][c+i]==0){maze[r][c+i]= 1;}
+              else{maze[r][c+i]= 2;}
+              } 
+              c=c+cells;}
+          else if(abs(card) == 180){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
+            for(int i = 0; i < cells; i++){
+              if(maze[r-i][c]==0){maze[r-i][c]= 1;}
+              else{maze[r-i][c]= 2;}
+              } 
+            r=r-cells;}
+          else if(card == 0){if(mflag==1){cells = 1;}//if(cells==0){cells = 1;}
+            for(int i = 0; i < cells; i++){
+              if(maze[r+i][c]==0){maze[r+i][c]= 1;}
+              else{maze[r+i][c]= 2;}
+              } 
+            r=r+cells;}
+            
+
+            
+          else{Serial.print("ERROR: Invalid Cardinal: ");Serial.println(card); Songs::playMarioTheme(); delay(100000);}
+          Serial.println("new Row and Column!");
+          Serial.print(r);
+          Serial.print(" ");
+          Serial.println(c);
+          Serial.print("Cells added ");
+          Serial.println(cells);        
+          
         }
       }
       break;
@@ -221,6 +280,7 @@ void awaitingInstructionsActions()
    Line Following State
 */
 void enterFollowingLineState() {
+  time0=micros()*(1e-6);
   state = State::FOLLOWING_LINE;
 
   leftMotorController.reset();
@@ -316,6 +376,9 @@ void identifyingJunctionActions(LineReading latestLineReading) {
    Turning State
 */
 void enterTurningState() {
+  time1 = micros()*(1e-6);
+  time1 = time1-time0;
+  cells = round(time1);
   state = State::TURNING;
 
   // Set target angle setpoint
@@ -523,8 +586,8 @@ int pickTurnAngle() {
       return -90;
 
     case Junction::LEFT_T:
-      directions += "S";
     case Junction::LINE:
+      directions += "S";
       return 0;
 
     case Junction::DEAD_END:
