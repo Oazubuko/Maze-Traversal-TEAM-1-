@@ -96,6 +96,13 @@ void setup() {
    3. Output the appropriate signals based on our current state + inputs
 */
 void loop() {
+  // Only run the loop occasionally
+  if (fsmTimer.peekTimeSinceLastLap() < (PID_SAMPLE_PERIOD_MS / 1000.)) {
+    return;
+  } else {
+    fsmTimer.lap();
+  }
+  
   // Read sensors
   LineReading lineReading = lineSensor.getReading();
   gyro.update();
@@ -207,8 +214,6 @@ void loop() {
 
   loopCount++;
   printStatus();
-
-  delay(PID_SAMPLE_PERIOD_MS);
 }
 
 /**
@@ -629,7 +634,7 @@ void updateMaze() {
     Serial.println(cells);  
     
     Serial.println("Current Maze: ");
-    printMaze();
+//    printMaze();
 }
 
 
@@ -718,7 +723,7 @@ void printStates(std::vector<State>& states) {
 }
 
 void printMaze() {
-  String columnLabels("  \t");
+  String columnLabels = " \t";  
   for (int col = 0; col < MAZE_COLS; col++) {
     columnLabels += col;
     

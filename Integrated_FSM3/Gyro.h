@@ -105,12 +105,7 @@ class Gyro {
      */
     void update() {
       if (IMU.gyroscopeAvailable()) {
-        float dt = _integrationTimer.lap();
-        float speed = getAngularSpeed();
-        _currentAngle += speed * dt;
-
-        // TODO: undo these changes
-        Serial.println("gyro dt, speed, angle: " + String(dt) + + ", " + String(speed) + ", " + String(_currentAngle));
+        _currentAngle += getAngularSpeed() * _integrationTimer.lap();
       }
     }
 
