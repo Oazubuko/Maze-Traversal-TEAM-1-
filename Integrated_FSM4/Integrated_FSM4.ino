@@ -676,10 +676,10 @@ int pickLeftHandedTurnAngle() {
   {
     case Junction::PLUS:
     case Junction::T:
-    case Junction::LEFT:
     case Junction::LEFT_T:
-      directions += "L";
       inLoop=false;
+    case Junction::LEFT:
+      directions += "L";
       return 90;
 
 
