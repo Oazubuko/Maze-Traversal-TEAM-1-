@@ -14,7 +14,7 @@
 #include "StateMachine.h"
 
 // Global state / data
-State state = State::FOLLOWING_LINE;
+State state = State::AWAITING_INSTRUCTIONS;
 int loopCount = 0;
 Junction identifiedJunction = Junction::LINE;
 LineReading firstLineReading = LineReading::LINE;
