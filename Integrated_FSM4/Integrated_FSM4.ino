@@ -15,7 +15,7 @@
 
 // Global state / data
 State state = State::AWAITING_INSTRUCTIONS;
-int loopCount = 0;
+bool inLoop;
 Junction identifiedJunction = Junction::LINE;
 LineReading firstLineReading = LineReading::LINE;
 float headingAngle = 0; // Start angle while centering on junction
@@ -143,7 +143,11 @@ void loop() {
          //determine the direction of travel
          int card = gyro.getCardinalDirectionAngle();
          //update the relavent maze elements based on the direction of travel
-         updateMaze(unitsTraveled, card);
+         bool loopDetected = updateMaze(unitsTraveled, card);
+         if(loopDetected == true)
+         {
+            inLoop = true;
+         }
          //
          //Serial.println("Row and Column");
          //Serial.print(currentR);
@@ -439,7 +443,15 @@ void enterTurningState() {
   turnController.Reset();
   leftMotorController.reset();
   rightMotorController.reset();
-  float targetAngle = gyro.getAngle() + pickRightHandedTurnAngle();
+  float targetAngle=0.0;
+  if(inLoop)
+  {
+      targetAngle = gyro.getAngle() + pickLeftHandedTurnAngle();
+  }
+  else
+  {
+      targetAngle = gyro.getAngle() + pickRightHandedTurnAngle();
+  }
   turnController.SetSetpoint(targetAngle);
 }//End of void enterRightHandedTurningState()
 
@@ -667,6 +679,7 @@ int pickLeftHandedTurnAngle() {
     case Junction::LEFT:
     case Junction::LEFT_T:
       directions += "L";
+      inLoop=false;
       return 90;
 
 
@@ -676,6 +689,7 @@ int pickLeftHandedTurnAngle() {
 
     case Junction::RIGHT_T:
       directions += "S";
+      inLoop=false;
     case Junction::LINE:
       return 0;
 
