@@ -54,7 +54,7 @@ constexpr float ENCODER_TICKS_PER_INCH = 84.91667; // TODO: improve
 
 // Number of consecutive line readings of a given type before
 // committing to a line reading.
-constexpr unsigned int LINE_CONFIDENCE_THRESHOLD = 4;
+constexpr unsigned int LINE_CONFIDENCE_THRESHOLD = 5;
 
 /**
  * Pins
@@ -77,7 +77,7 @@ constexpr PIDConstants TURN_CONSTANTS = { 0.14, 0, 0 };
 constexpr float SKEW_ADJUSTMENT_FACTOR = 4;
 constexpr float ANGLE_ADJUSTMENT_FACTOR = 0.2;
 constexpr float SPEED_THROTTLE = 0.45; // % of max motor speed
-constexpr float BASE_SPEED = 15; // Inches / sec
+constexpr float BASE_SPEED = 12; // Inches / sec
 constexpr float ID_JUNCTION_SPEED = 8; // Inches / sec
 constexpr float MAX_TURN_SPEED = 13; // Inches / sec
 #else
@@ -98,13 +98,13 @@ constexpr float DEGREE_THRESHOLD = 3;
 constexpr float SETTLING_TIME = 0.35; // Seconds
 constexpr float PID_TIMEOUT = 5; // Seconds
 
-constexpr float inchToCm = 2.54; // conversion factor need to convert from inches to centimeters
-constexpr float BASE_SPEED_CM = BASE_SPEED*inchToCm;
-constexpr float CM_PER_UNIT = 15.0;
-constexpr float UNIT_SPEED = BASE_SPEED_CM/CM_PER_UNIT;
+//constexpr float inchToCm = 2.54; // conversion factor need to convert from inches to centimeters
+//constexpr float BASE_SPEED_CM = BASE_SPEED*inchToCm;
+//constexpr float CM_PER_UNIT = 15.0;
+constexpr float UNIT_SPEED = 1; // Roughly 1 cell per second
 
-constexpr int NUM_MAZE_ROWS = 128;
-constexpr int NUM_MAZE_COLUMNS = 128;
+constexpr int NUM_MAZE_ROWS = 51;
+constexpr int NUM_MAZE_COLUMNS = 51;
 /**
  * Robot Dimensions
  */
