@@ -72,7 +72,7 @@ bool   asked4directions = false;          // Integrated Code
 int current_position = -1;                // Integrated Code
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   Songs::playStarWarsTheme();
 
@@ -158,6 +158,10 @@ void loop() {
         } else if (identifiedJunction == Junction::LINE) {
           enterFollowingLineState();
         } else {
+          // Printing the maze takes a long time, so make sure to stop the robot
+          // before doing anything crazy!
+          leftMotor.stop();
+          rightMotor.stop();
           updateMaze();          
           enterTurningState();
         }
@@ -634,7 +638,7 @@ void updateMaze() {
     Serial.println(cells);  
     
     Serial.println("Current Maze: ");
-//    printMaze();
+    printMaze();
 }
 
 
@@ -697,6 +701,7 @@ void printStatus() {
     Serial.print("Line Sensor Vals: "); lineSensor.printAllSensorValues();
     Serial.print("Left Motor Controller: "); leftMotorController.print();
     Serial.print("Right Motor Controller: "); rightMotorController.print();
+    Serial.print("Turn Controller: "); turnController.Print();
     Serial.println();
 
     prevStates.clear();
@@ -722,26 +727,31 @@ void printStates(std::vector<State>& states) {
   Serial.println(stateString);
 }
 
+/**
+ * Prints out the maze (C-style strings are used to prevent heap fragmentation)
+ */
 void printMaze() {
-  String columnLabels = " \t";  
+  char columnLabels[MAZE_COLS * 3 + 2] = "\t";
+  char* stringCursor = columnLabels + 1;
   for (int col = 0; col < MAZE_COLS; col++) {
-    columnLabels += col;
-    
-    // Add 1 or 2 spaces depending on how whehter the current column is 1 or 2 digits.
+    // Add 1 or 2 spaces depending on whether the current column is 1 or 2 digits.
     // This functionality will break if the number of columns exceeds 99.
-    columnLabels += (col < 10) ? "  " : " ";
+    const char* spacing = (col < 10) ? "  " : " ";
+    
+    stringCursor += sprintf(stringCursor, "%d%s", col, spacing);
   }
   
-  String mazeString;
+  char mazeString[MAZE_ROWS * (MAZE_COLS * 3 + 4) + 1] = "";
+  stringCursor = mazeString;
   for (int row = 0; row < MAZE_ROWS; row++) {
-    mazeString += row;
-    mazeString += '\t';
-    
+    // Row identifiers
+    stringCursor += sprintf(stringCursor, "%d\t", row);
+
+    // Drawing maze values
     for (int col = 0; col < MAZE_COLS; col++) {
-      mazeString += maze[row][col];
-      mazeString += "  "; // 2 spaces
+      stringCursor += sprintf(stringCursor, "%d  ", maze[row][col]);
     }
-    mazeString += '\n';
+    stringCursor += sprintf(stringCursor, "\n");
   }
 
   Serial.println(columnLabels);
