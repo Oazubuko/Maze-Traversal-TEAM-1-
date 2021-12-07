@@ -140,7 +140,9 @@ void loop() {
          timeEnd = micros()*(1e-6);
          float deltaT = timeEnd-timeStart;
          //calculate the number of "units" traveled
-         int unitsTraveled = round(deltaT*UNIT_SPEED);
+         //int unitsTraveled = round(deltaT*UNIT_SPEED);
+         float unitsFromOffCenterRobot = UNIT_SPEED / 2;
+         int unitsTraveled = round(deltaT * UNIT_SPEED + unitsFromOffCenterRobot);
          //determine the direction of travel
          int card = gyro.getCardinalDirectionAngle();
          //update the relavent maze elements based on the direction of travel
@@ -293,12 +295,12 @@ bool updateMaze(int unitsTraveled, int angle) //Added to Integrate Machi's Code
          else if(abs(angle) == 180)
          {
              //currentR=currentR-unitsTraveled;
-             currentR--;
+             currentR++;
          }
          else if(angle == 0)
          {
              //currentR=currentR+unitsTraveled;
-             currentR++;
+             currentR--;
          }
          
          //Save angle of entry in new location if not previously visited
@@ -353,10 +355,10 @@ void followingLineActions() {
   // Determine angular adjustment using the line sensor's 'skew' measurement
   // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
   float skew = lineSensor.getSkew2();
-  float skew1 = lineSensor.getSkew();
+  //float skew1 = lineSensor.getSkew();
 
-  double leftSpeed = ID_JUNCTION_SPEED - SKEW_ADJUSTMENT_FACTOR * skew;
-  double rightSpeed = ID_JUNCTION_SPEED + SKEW_ADJUSTMENT_FACTOR * skew;
+  float leftSpeed = ID_JUNCTION_SPEED - SKEW_ADJUSTMENT_FACTOR * skew;
+  float rightSpeed = ID_JUNCTION_SPEED + SKEW_ADJUSTMENT_FACTOR * skew;
   updateMotorSpeeds(leftSpeed, rightSpeed);
 }
 
@@ -807,7 +809,7 @@ void printStatus() {
     Serial.print("Current Position: "); posEstimator.print();
     Serial.print("Line Sensor Vals: "); lineSensor.printAllSensorValues();
     Serial.print("Left Motor Controller: "); leftMotorController.print();
-    Serial.print("Right Motor Controller: "); leftMotorController.print();
+    Serial.print("Right Motor Controller: "); rightMotorController.print();
     Serial.println();
 
     prevStates.clear();
