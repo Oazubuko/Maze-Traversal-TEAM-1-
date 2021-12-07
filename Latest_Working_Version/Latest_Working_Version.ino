@@ -68,7 +68,7 @@ bool   hasConnected     = false;          //Integrated Code
 bool   hasFirstMessage  = false;          // Integrated Code
 bool   hasFinished      = false;          // Integrated Code
 bool   asked4directions = false;          // Integrated Code
-int current_position = 0;                 // Integrated Code
+int current_position = -1;                 // Integrated Code
 
 void setup() {
   Serial.begin(9600);
@@ -88,7 +88,9 @@ void setup() {
   fsmTimer.zeroOut();
 
   initializeMaze();
-  maze[currentR][currentC] =gyro.getCardinalDirectionAngle();
+  
+  // Initialize the start time for maze mapping to handle cases where the initial state is FOLLOWING_LINE
+  timeStart = micros() * 1e-6;
 }//End of setup()
 
 /**
@@ -141,24 +143,25 @@ void loop() {
          float deltaT = timeEnd-timeStart;
          //calculate the number of "units" traveled
          //int unitsTraveled = round(deltaT*UNIT_SPEED);
-         float unitsFromOffCenterRobot = UNIT_SPEED / 2;
+         float unitsFromOffCenterRobot = ROBOT_HEIGHT_CM / CM_PER_UNIT;
          int unitsTraveled = round(deltaT * UNIT_SPEED + unitsFromOffCenterRobot);
          //determine the direction of travel
-         int card = gyro.getCardinalDirectionAngle();
+         int card = gyro.getCardinalAngle();
          //update the relavent maze elements based on the direction of travel
          bool loopDetected = updateMaze(unitsTraveled, card);
          if(loopDetected == true)
          {
+            Songs::playSound(NOTE_C4, 500);
             inLoop = true;
          }
          //
-         //Serial.println("Row and Column");
-         //Serial.print(currentR);
-         //Serial.print(" ");
-         //Serial.println(currentC);
-         //Serial.print("Cells ");
-         //Serial.println(deltaT);
-         //printMaze();        
+//         Serial.println("Row and Column: " + String(currentR) + " " + String(currentC));
+//         Serial.println("Units Traveled: " + String(unitsTraveled));
+//         Serial.println("DeltaT: " + String(deltaT));
+//         Serial.println("Units Travled from Offcenter: " + String(unitsFromOffCenterRobot));
+//         Serial.println("Unit Speed: " + String(UNIT_SPEED));
+//         Serial.println("Maze: ");
+//         printMaze();        
          //Transition to Next State
          
       }
@@ -215,10 +218,6 @@ void loop() {
       
       break;
 
-    //case State::OPTIMIZED_MAZE_RUN:
-      //optimizedMazeRunActions();
-      //break;
-
     case State::TRANSMITTING_DIRECTIONS:
       transmittingDirectionsActions();
       
@@ -240,7 +239,7 @@ void loop() {
   }
 
   loopCount++;
-  printStatus();
+//  printStatus();
 
   delay(PID_SAMPLE_PERIOD_MS);
 }
@@ -261,16 +260,48 @@ void initializeMaze() //Added to Integrate Machi's Code
 //Prints the current Maze data to the Serial Line
 void printMaze() //Added to Integrate Machi's Code
 {
-    Serial.println("maze");    
+    char mazeString[NUM_MAZE_ROWS * (NUM_MAZE_COLUMNS + 1) + 1];
+    int cursor = 0;
+    
     for(int j = 0; j < NUM_MAZE_ROWS; j++)
     {
-        Serial.print("row: ");
         for(int i = 0; i < NUM_MAZE_COLUMNS; i++)
         {
-            Serial.print(maze[j][i]);
-        }//End of inner for loop
-        Serial.println(" ");
-    }//End of outer for loop
+            switch(maze[j][i]) {
+              case 0:
+                mazeString[cursor] = '^';
+                break;
+                
+              case 90:
+                mazeString[cursor] = '<';
+                break;
+              
+              case 180:
+                mazeString[cursor] = 'v';
+                break;
+              
+              case 270:
+                mazeString[cursor] = '>';
+                break;
+
+              case -1:
+                mazeString[cursor] = ' ';
+                break;
+
+              default:
+                Serial.print("Bad maze value at maze[" + String(j) + "][" + String(i) + "]: " + maze[j][i]);              
+            }
+
+            cursor++;
+        }
+
+        mazeString[cursor++] = '\n';
+    }
+    
+    // Null terminate the string
+    mazeString[cursor] = '\0';
+
+    Serial.println(mazeString);
 
 }//End of void printMazeData()
 
@@ -287,12 +318,12 @@ bool updateMaze(int unitsTraveled, int angle) //Added to Integrate Machi's Code
              //currentC=currentC-unitsTraveled;
              currentC--;
          }
-         else if( (angle == 270)||(angle == -90) )
+         else if(angle == 270)
          {
              //currentC=currentC+unitsTraveled;
              currentC++;
          }
-         else if(abs(angle) == 180)
+         else if(angle == 180)
          {
              //currentR=currentR-unitsTraveled;
              currentR++;
@@ -357,8 +388,8 @@ void followingLineActions() {
   float skew = lineSensor.getSkew2();
   //float skew1 = lineSensor.getSkew();
 
-  float leftSpeed = ID_JUNCTION_SPEED - SKEW_ADJUSTMENT_FACTOR * skew;
-  float rightSpeed = ID_JUNCTION_SPEED + SKEW_ADJUSTMENT_FACTOR * skew;
+  float leftSpeed = BASE_SPEED - SKEW_ADJUSTMENT_FACTOR * skew;
+  float rightSpeed = BASE_SPEED + SKEW_ADJUSTMENT_FACTOR * skew;
   updateMotorSpeeds(leftSpeed, rightSpeed);
 }
 
@@ -375,12 +406,6 @@ void enterIdentifyingJunctionState(LineReading latestLineReading) {
   identifiedJunction = Junction::UNKNOWN;
 
   switch (firstLineReading) {
-    // Empty line readings are always dead ends
-    case LineReading::EMPTY:
-      identifiedJunction = Junction::DEAD_END;
-      playToneFor(identifiedJunction);
-      break;
-
     case LineReading::END_OF_MAZE:
       identifiedJunction = Junction::END_OF_MAZE;
       playToneFor(identifiedJunction);
@@ -400,6 +425,9 @@ void enterIdentifyingJunctionState(LineReading latestLineReading) {
       Songs::playErrorSong();
       break;
 
+    // For accurate maze mapping, we have to center on dead ends before turning around
+    case LineReading::EMPTY:
+    
     // A single one of these readings is ambiguous, so we need to get another check
     // before determining the junction type
     case LineReading::FULL:
@@ -423,8 +451,8 @@ void enterIdentifyingJunctionState(LineReading latestLineReading) {
 void identifyingJunctionActions(LineReading latestLineReading) {
   // Drive both motors straight, correcting for slight errors in heading
   double angularAdjustment = (gyro.getAngle() - headingAngle) * ANGLE_ADJUSTMENT_FACTOR;
-  double leftSpeed = BASE_SPEED + angularAdjustment;
-  double rightSpeed = BASE_SPEED - angularAdjustment;
+  double leftSpeed = ID_JUNCTION_SPEED + angularAdjustment;
+  double rightSpeed = ID_JUNCTION_SPEED - angularAdjustment;
   updateMotorSpeeds(leftSpeed, rightSpeed);
 
   if (leftMotorController.reachedMaxPosition() && rightMotorController.reachedMaxPosition()) {
@@ -896,8 +924,8 @@ void driveForward(double inches) {
     gyro.update();
 
     double angularAdjustment = (gyro.getAngle() - headingAngle) * ANGLE_ADJUSTMENT_FACTOR;
-    double leftSpeed = ID_JUNCTION_SPEED + angularAdjustment;
-    double rightSpeed = ID_JUNCTION_SPEED - angularAdjustment;
+    double leftSpeed = BASE_SPEED + angularAdjustment;
+    double rightSpeed = BASE_SPEED - angularAdjustment;
     updateMotorSpeeds(leftSpeed, rightSpeed);
 
     Serial.println(String(leftMotorController.getTargetPosition()) + "\t" + String(leftMotor.getInchesDriven()) + "\t" +

@@ -40,7 +40,7 @@ void finishedActions();
 void enterFollowingLineState();
 void enterIdentifyingJunctionState(LineReading);
 void enterTurningState();
-void enterFollowingDirectionsState();
+void enterFollowingDirectionsState(LineReading);
 void enterTransmittingDirectionsState();
 void enterFinishedState();
 // TODO: add entry functions for integrated states
