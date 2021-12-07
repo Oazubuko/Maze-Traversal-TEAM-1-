@@ -14,7 +14,7 @@
 #include "StateMachine.h"
 
 // Global state / data
-State state = State::FOLLOWING_LINE;
+State state = State::AWAITING_INSTRUCTIONS;
 bool inLoop;
 Junction identifiedJunction = Junction::LINE;
 LineReading firstLineReading = LineReading::LINE;
@@ -91,7 +91,7 @@ void setup() {
   maze[currentR][currentC] =gyro.getCardinalAngle();
 
   // Set timeStart in cases where the initial state is FOLLOWING_LINE
-  timeStart = micros() * 1e-6;
+  //timeStart = micros() * 1e-6;
 }//End of setup()
 
 /**
@@ -176,7 +176,8 @@ void loop() {
          if (loopDetected) {
             Serial.println("Detected a loop!");
          }
-         printMaze();
+         //Restoring the code below causes issues restore only during for debug and then comment back out
+         //printMaze();
       }
       else if ( (lineReading != LineReading::LINE)&&(current_position>=0)&&(current_position<directions.length() ) )
       {
@@ -256,6 +257,7 @@ void loop() {
 
   loopCount++;
   printStatus();
+  //delay(PID_SAMPLE_PERIOD_MS);
 }
 
 //Set all elements of the current Maze data to the same initial value
@@ -380,8 +382,8 @@ void followingLineActions() {
   // Positive skew -> robot is tilted right -> need to turn left -> rightMotor high and leftMotor low
   float skew = lineSensor.getSkew2();
 
-  float leftSpeed = BASE_SPEED - SKEW_ADJUSTMENT_FACTOR * skew;
-  float rightSpeed = BASE_SPEED + SKEW_ADJUSTMENT_FACTOR * skew;
+  float leftSpeed = ID_JUNCTION_SPEED - SKEW_ADJUSTMENT_FACTOR * skew;
+  float rightSpeed = ID_JUNCTION_SPEED + SKEW_ADJUSTMENT_FACTOR * skew;
   updateMotorSpeeds(leftSpeed, rightSpeed);
 
   
@@ -450,8 +452,8 @@ void enterIdentifyingJunctionState(LineReading latestLineReading) {
 void identifyingJunctionActions(LineReading latestLineReading) {
   // Drive both motors straight, correcting for slight errors in heading
   double angularAdjustment = (gyro.getAngle() - headingAngle) * ANGLE_ADJUSTMENT_FACTOR;
-  double leftSpeed = ID_JUNCTION_SPEED + angularAdjustment;
-  double rightSpeed = ID_JUNCTION_SPEED - angularAdjustment;
+  double leftSpeed = BASE_SPEED + angularAdjustment;
+  double rightSpeed = BASE_SPEED - angularAdjustment;
   updateMotorSpeeds(leftSpeed, rightSpeed);
 
   if (leftMotorController.reachedMaxPosition() && rightMotorController.reachedMaxPosition()) {
