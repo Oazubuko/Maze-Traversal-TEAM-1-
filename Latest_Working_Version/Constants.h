@@ -13,8 +13,8 @@
 /**
  * Mouse Owner variables (used for mouse-specific configuration)
  */
-#define ZACHS_MOUSE             // Comment this line if you're not Zach
-//#define MACHIS_MOUSE          // Comment this line if you're not Machi
+//#define ZACHS_MOUSE             // Comment this line if you're not Zach
+#define MACHIS_MOUSE          // Comment this line if you're not Machi
 //#define EDS_MOUSE             // Comment this line if you're not Ed
 
 /**

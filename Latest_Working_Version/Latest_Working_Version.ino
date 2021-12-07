@@ -211,7 +211,6 @@ void loop() {
         } else if (identifiedJunction == Junction::LINE) {
           enterFollowingLineState();
         } else {
-          current_position++;
           enterTurningState();
         }
       }
@@ -572,6 +571,7 @@ void followingDirectionsActions() {
     }
     else
     {
+        Serial.println("Found a false junction, driving straight.");
         identifiedJunction = Junction::LINE;
     }
     playToneFor(identifiedJunction);
@@ -745,8 +745,11 @@ Junction junctionFromDirections() {
   //int len = directions.length();
   char current=directions.charAt(current_position);
   Serial.print(directions);
-  Serial.print("current = ");
+  Serial.print(" current = ");
   Serial.println(current);
+  Serial.println("Current Position in Directions: " + String(current_position));
+
+  current_position++;
   
   switch (current) 
   {
