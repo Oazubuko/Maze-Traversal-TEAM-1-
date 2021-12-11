@@ -81,10 +81,24 @@ class Gyro {
        the angle to the range [0, 360)
     */
     void alignWithCardinalDirection() {
-      int closestMultiple = round(_currentAngle / 90);
-      setAngle(90 * (closestMultiple % 4));
+      setAngle(getCardinalAngle());
     }
 
+    /**
+       Returns the current angle to the closest multiple of 90 degrees. Limits
+       the angle to the range [0, 360)
+    */
+    int getCardinalAngle() {
+      int closestMultiple = round(_currentAngle / 90);
+      setAngle(90 * (closestMultiple % 4));
+      int angle = 90 * (closestMultiple % 4);
+
+      if (angle < 0) {
+        angle += 360;
+      }
+
+      return angle;
+    }
 
     /**
      * Computes and returns the angle in degrees using Euler's Method

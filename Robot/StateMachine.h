@@ -9,9 +9,9 @@ enum class State {
   FOLLOWING_LINE,
   IDENTIFYING_JUNCTION,
   TURNING,
-  FINISHED,
-  OPTIMIZED_MAZE_RUN,
-  TRANSMITTING_DIRECTIONS
+  FOLLOWING_DIRECTIONS,
+  TRANSMITTING_DIRECTIONS,
+  FINISHED
 };
 
 String stateAsString(State state) {
@@ -20,9 +20,9 @@ String stateAsString(State state) {
     case State::FOLLOWING_LINE: return "Following Line";
     case State::IDENTIFYING_JUNCTION: return "Identifying Junction";
     case State::TURNING: return "Turning";
-    case State::FINISHED: return "Finished";
-    case State::OPTIMIZED_MAZE_RUN: return "Run Maze Based on Directions from Jetson";
+    case State::FOLLOWING_DIRECTIONS: return "Following Directions from Jetson";
     case State::TRANSMITTING_DIRECTIONS: return "Transmitting Instructions to Jetson";
+    case State::FINISHED: return "Finished";
     default: return "Unknown state!";
   }
 }
@@ -32,14 +32,15 @@ void awaitingInstructionsActions();
 void followingLineActions();
 void identifyingJunctionActions(LineReading);
 void turningActions();
-void finishedActions();
-void optimizedMazeRunActions();
+void followingDirectionsActions();
 void transmittingDirectionsActions();
+void finishedActions();
 
 // State entry functions
 void enterFollowingLineState();
 void enterIdentifyingJunctionState(LineReading);
 void enterTurningState();
-void enterFinishedState();
+void enterFollowingDirectionsState(LineReading);
 void enterTransmittingDirectionsState();
+void enterFinishedState();
 // TODO: add entry functions for integrated states

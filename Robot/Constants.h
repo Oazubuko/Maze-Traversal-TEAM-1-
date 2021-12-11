@@ -13,8 +13,8 @@
 /**
  * Mouse Owner variables (used for mouse-specific configuration)
  */
-#define ZACHS_MOUSE             // Comment this line if you're not Zach
-//#define MACHIS_MOUSE          // Comment this line if you're not Machi
+//#define ZACHS_MOUSE             // Comment this line if you're not Zach
+#define MACHIS_MOUSE          // Comment this line if you're not Machi
 //#define EDS_MOUSE             // Comment this line if you're not Ed
 
 /**
@@ -77,7 +77,7 @@ constexpr PIDConstants TURN_CONSTANTS = { 0.14, 0, 0 };
 constexpr float SKEW_ADJUSTMENT_FACTOR = 4;
 constexpr float ANGLE_ADJUSTMENT_FACTOR = 0.2;
 constexpr float SPEED_THROTTLE = 0.45; // % of max motor speed
-constexpr float BASE_SPEED = 15; // Inches / sec
+constexpr float BASE_SPEED = 8; // Inches / sec
 constexpr float ID_JUNCTION_SPEED = 8; // Inches / sec
 constexpr float MAX_TURN_SPEED = 13; // Inches / sec
 #else
@@ -98,8 +98,17 @@ constexpr float DEGREE_THRESHOLD = 3;
 constexpr float SETTLING_TIME = 0.35; // Seconds
 constexpr float PID_TIMEOUT = 5; // Seconds
 
+constexpr float inchToCm = 2.54; // conversion factor need to convert from inches to centimeters
+constexpr float BASE_SPEED_CM = BASE_SPEED*inchToCm;
+constexpr float CM_PER_UNIT = 15.0;
+
+constexpr float UNIT_SPEED = BASE_SPEED_CM / CM_PER_UNIT;
+
+constexpr int NUM_MAZE_ROWS = 99;
+constexpr int NUM_MAZE_COLUMNS = 99;
 /**
  * Robot Dimensions
  */
 constexpr float ROBOT_HEIGHT_INCHES = 3; // Distance from line sensor to wheels
+constexpr float ROBOT_HEIGHT_CM = ROBOT_HEIGHT_INCHES * inchToCm;
 constexpr float ROBOT_RADIUS_INCHES = 1.5625;
